@@ -1,1 +1,1 @@
-from . import lags_creator
+from . import lag_generator
