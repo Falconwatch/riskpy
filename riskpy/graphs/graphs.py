@@ -28,12 +28,13 @@ def rocs(y_true, y_pred, colors, names, name=''):
         print(len(y_true), len(y_pred), len(colors))
         raise BaseException
     plt.figure(figsize=[10, 10])
+    ginis=[]
 
     for i in range(0, len(y_true)):
-        print(i)
         fpr, tpr, _ = roc_curve(y_true=y_true[i], y_score=y_pred[i], pos_label=None)
         roc_auc = auc(fpr, tpr)
         gini = 2 * roc_auc - 1
+        ginis.append(gini)
         lw = 2
         plt.plot(fpr, tpr, color=colors[i], label=names[i] + ' (Gini = %0.4f)' % gini)
     plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
@@ -91,31 +92,24 @@ def one_bin_barchart(bining, size=5):
     if len(total_bins) == 0:
         print('No binning for variable',bining._name)
         return
-    heights = []
-    label = "Ratio"
-
-    if len(bining._gaps_avg) == 0:
-        heights = bining._gaps_counts_shares
-    else:
-        heights = bining._gaps_avg
-        label = 'AVG'
-
-    max_y = np.max(heights) * 1.2
-    min_y = np.min(heights + [0]) * 1.2
-
-    plt.figure(figsize=(size * 2, size))
-    ax = plt.subplot()
-    plt.ylim([min_y, max_y])
-    ax.bar(total_bins, height=heights, color='lightblue', label='ssss')
-    _autolabel(ax, heights, bining._woes)
-    ax.set_ylabel(label)
-    ax.set_title(label + ' for ' + str(bining._name))
-    ax.set_xticks(total_bins)
-    ax.axhline(y=0, linewidth=1)
-
+    
+    #высота столбцов - численность
+    bins_counts=[b[0]+b[1] for b in bining._counts if len(b)==2]
+    #линия - доля плохих в бакете
+    bins_dr=[b[1]/(b[0]+b[1]) for b in bining._counts if len(b)==2]
+    
+    fig, ax =plt.subplots()   
+    ax.bar(total_bins, bins_counts, width=0.5, color='green',)
+    ax.set(ylabel = 'Число наблюдений в бакете')
+    ax2=ax.twinx()
+    ax2.plot(bins_dr, color='orange',marker='o')
+    ax2.grid(b='off') 
+    ax2.set(ylabel = 'Уровень дефолтов')
+    
     x_labels = ['<=' + str(gap[1]) for gap in bining._gaps]
-
+    ax.set_xticks(total_bins)
     ax.set_xticklabels(x_labels)
+    plt.title(bining._name)
     plt.show()
 
 
