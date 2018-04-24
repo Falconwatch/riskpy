@@ -2,6 +2,10 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
 from sklearn.metrics import precision_recall_curve, average_precision_score
 import numpy as np
+import math
+import itertools as it
+from ..utilities.common_metrics import gini
+from sklearn.tree import DecisionTreeClassifier
 
 
 def roc(y_true, y_pred, name=""):
@@ -116,3 +120,86 @@ def one_bin_barchart(bining, size=5):
 def binning_barchart(bins, size=3):
     for bining in bins:
         one_bin_barchart(bining, size=size)
+        
+
+
+
+
+def VariablesInteraction(X_train,y_train, X_test=None, y_test=None, classes=None,
+                         figsize=[20,20], max_tree_depth=5, mode='full', dpath='mono'):
+    plt.clf()
+    possible_pairs=[]
+    if mode=='single':
+        possible_pairs=list(it.combinations(X_train.columns, r=1))
+    elif mode=='pairs':
+        possible_pairs=list(it.combinations(X_train.columns, r=2))
+    elif mode=='full':
+         possible_pairs=list(it.combinations(X_train.columns, r=1))+list(it.combinations(X_train.columns, r=2))
+    else:
+        raise BaseException('Wrong mode {}'.format(mode))
+    
+    if X_test is None or y_test is None:
+            X_test=X_train
+            y_test=y_train
+    
+    #return possible_pairs
+    plt.figure(figsize=figsize)
+    for i in range(len(possible_pairs)):
+        pair=list(possible_pairs[i])
+        
+        X = X_train.loc[:, pair]
+        y = y_train
+        X_t=X_test.loc[:, pair]
+        y_t=y_test
+        
+        if len(pair)==1:
+            X['const']=0
+            X_t['const']=0
+            pair.append('const')
+
+        # Train
+        clf = DecisionTreeClassifier(max_depth=max_tree_depth).fit(X, y)
+        # Plot the decision boundary
+        h_g=min([3,len(possible_pairs)])
+        plt.subplot(math.ceil(len(possible_pairs)/h_g), h_g, i+1)
+        _plotTreePath(clf,pair,X, y, X_t, y_t, dpath)
+
+    #plt.suptitle("Decision surface of a decision tree using paired features")
+    
+    plt.axis("tight")
+    plt.show()
+    
+    
+def _plotTreePath(clf, pair, X, y, X_t, y_t, dpath='mono'):
+    n_classes = len(y.unique())
+    plot_colors = "rb"
+    plot_step = 0.02
+    
+    x_min, x_max = X.loc[:, pair[0]].min() - 1, X.loc[:, pair[0]].max() + 1
+    y_min, y_max = X.loc[:, pair[1]].min() - 1, X.loc[:, pair[1]].max() + 1
+    
+    x_plot_step=(x_max-x_min)/1000
+    y_plot_step=(y_max-y_min)/1000
+    
+
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, x_plot_step), np.arange(y_min, y_max, y_plot_step))
+    plt.tight_layout(h_pad=0.5, w_pad=0.5, pad=2.5)
+    
+    if dpath=='mono':
+        Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
+    else:
+        Z=np.array([p[0] for p in clf.predict_proba(np.c_[xx.ravel(), yy.ravel()])])
+    Z = Z.reshape(xx.shape)
+    cs = plt.contourf(xx, yy, Z, cmap=plt.cm.RdBu)
+    
+    g=gini(y_pred=[p[1] for p in clf.predict_proba(X_t)],y_true=y_t)
+
+    plt.xlabel(pair[0])
+    plt.ylabel(pair[1])
+    plt.title('Gini: %0.4f' % g)
+    # Plot the testing points
+    for i, color in zip(range(n_classes), plot_colors):
+        idx = np.where(y_t == i)
+        plt.scatter(X_t.iloc[idx][pair[0]], X_t.iloc[idx][pair[1]], c=color, label=i,
+                    cmap=plt.cm.RdBu, edgecolor='black', s=15)
+    plt.legend(loc='lower right', borderpad=0, handletextpad=0)
