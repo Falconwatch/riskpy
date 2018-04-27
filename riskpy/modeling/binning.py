@@ -305,7 +305,7 @@ class Binner:
             gaps_shares.append([gap_goods_share, gap_bads_share])
             gaps_woe.append(woe)
 
-        gaps_counts_shares = [(gaps_count[0]) / (gaps_count[1]) for gaps_count in gaps_counts]
+        gaps_counts_shares = [ (gaps_count[0]+0.000001) / (gaps_count[1]+0.000001) for gaps_count in gaps_counts]
 
         return gaps_shares, gaps_woe, gaps_counts, gaps_counts_shares, gaps_avg
 
