@@ -8,15 +8,17 @@ from ..graphs.graphs import rocs, roc
 import pandas as pd
 from ..utilities.common_metrics import vif
 import matplotlib.pyplot as plt
+from sklearn.metrics import r2_score
 
 
 
 class Modeler:
-    def __init__(self, train_dataset, test_dataset, oot_dataset, target):
+    def __init__(self, train_dataset, test_dataset, oot_dataset, target, kind='class'):
         self._train=train_dataset
         self._test=test_dataset
         self._oot=oot_dataset
         self._target=target
+        self._kind=kind
         self._fitted_model=None
         self._columns=None
         self._sw_log=None
@@ -30,18 +32,18 @@ class Modeler:
         result=pd.DataFrame(index=columns)
         
         if self._train is not None:
-            train_onefactor_gini=self._oneFactorGini(self._train, columns, multiplier)
-            result['TRAIN']= [t[1] for t in train_onefactor_gini]
+            train_onefactor_imp=self._oneFactorImportance(self._train, columns, multiplier)
+            result['TRAIN']= [t[1] for t in train_onefactor_imp]
             
         if self._test is not None:
-            test_onefactor_gini=self._oneFactorGini(self._test, columns, multiplier)
-            result['TEST']= [t[1] for t in test_onefactor_gini]
+            train_onefactor_imp=self._oneFactorImportance(self._test, columns, multiplier)
+            result['TEST']= [t[1] for t in train_onefactor_imp]
             
         if self._oot is not None:
-            oot_onefactor_gini=self._oneFactorGini(self._oot, columns, multiplier)
-            result['OOT']= [t[1] for t in oot_onefactor_gini]
+            train_onefactor_imp=self._oneFactorImportance(self._oot, columns, multiplier)
+            result['OOT']= [t[1] for t in train_onefactor_imp]
 
-            return result    
+        return result    
         
     def Fit(self, columns): 
         self._columns=columns
@@ -69,18 +71,28 @@ class Modeler:
         oot_fact=self._oot[self._target]        
         
         return rocs([train_fact,test_fact, oot_fact],[train_predicted,test_predicted,oot_predicted],['g','r','y'],['train','test','oot'])
-            
+    
+    def Predict(self, data=None):
+        if data is not None:
+            fact=[data[self._target].values]
+            predict=[self._fitted_model.predict(data)]
+            return fact, predict
+        else:
+            fact=[self._train[self._target].values, self._test[self._target].values, self._oot[self._target].values]
+            predict=[self._fitted_model.predict(self._train), self._fitted_model.predict(self._test), self._fitted_model.predict(self._oot)]
+            return fact, predict
+    
     def VIF(self):
         if self._fitted_model is None or self._columns is None:
             raise Exception('Modeller is not fitted')
-        vifs=vif(self._train[self._columns])
+        vifs=vif(self._train[self._columns].dropna())
         #return vifs
         return pd.DataFrame([v[1] for v in vifs], 
                             index=[v[0] for v in vifs], 
                             columns=['VIF'])
     
     
-    def StepwiseSelection(self, factors, p_in=1, p_out=0.1):
+    def StepwiseSelection(self, factors, p_in=1, p_out=0.1, kind='class'):
         log=[]
         models=[]
         
@@ -89,7 +101,7 @@ class Modeler:
             log.append(log_text)
 
             
-        factors_importance=self._oneFactorGini(self._train, factors, -1)
+        factors_importance=self._oneFactorImportance(self._train, factors)
         factors_importance.sort(key=lambda x: x[1],reverse=True)
         
         factors_in_model=dict()
@@ -111,7 +123,7 @@ class Modeler:
             
             #принмаем решение по удалению переменных
             too_big_p_values = p_values[p_values>p_out]
-            while len(too_big_p_values)>0:
+            while len(too_big_p_values)>0 and len(factors_in_model)>1:
                 factor_to_remove=too_big_p_values.index[0]
                 factor_to_remove_p_val=too_big_p_values[0]
                 del factors_in_model[factor_to_remove]
@@ -153,23 +165,39 @@ class Modeler:
 
     ###private###   
     
-    def _fitModel(self, columns):
-        
-        print(columns)
+    def _fitModel(self, columns, kind='class'):
         columns_in_model_str=" + ".join(columns)
-        print(columns_in_model_str)
-        model=smf.logit("{} ~ {}".format(self._target, columns_in_model_str), data=self._train)
+        #print(columns_in_model_str)
+        if self._kind=='class':
+            model=smf.logit("{} ~ {}".format(self._target, columns_in_model_str), data=self._train)
+        else:
+            model=smf.ols("{} ~ {}".format(self._target, columns_in_model_str), data=self._train)
         fitted_model=model.fit()
         return fitted_model
     
     def _getModelPvalues(self, fitted_model):
         p_values=fitted_model.pvalues
         p_values.sort_values(ascending=False, inplace=True)
-        return p_values  
+        return p_values[p_values.index!='Intercept']  
     
     def _oneFactorGini(self, data, columns, multiplier):
         onefactor_result=[]
         for column in columns:
-            g=gini(y_pred=multiplier*data[column],y_true=data[self._target]) 
+            tmp_data=data[[column, self._target]].dropna()
+            g=gini(y_pred=multiplier*tmp_data[column],y_true=tmp_data[self._target]) 
             onefactor_result.append([column, g])
         return onefactor_result
+    
+    def _oneFactorR2(self, data, columns):
+        onefactor_result=[]
+        for column in columns:
+            tmp_data=data[[column, self._target]].dropna()
+            r2=r2_score(y_pred=tmp_data[column],y_true=tmp_data[self._target]) 
+            onefactor_result.append([column, r2])
+        return onefactor_result
+    
+    def _oneFactorImportance(self, data, columns, multiplier=-1):
+        if self._kind=='class':
+            return self._oneFactorGini(data, columns, multiplier)
+        else:
+            return self._oneFactorR2( data, columns)

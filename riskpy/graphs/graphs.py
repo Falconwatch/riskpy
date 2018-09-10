@@ -6,6 +6,7 @@ import math
 import itertools as it
 from ..utilities.common_metrics import gini
 from sklearn.tree import DecisionTreeClassifier
+import pandas as pd
 
 
 def roc(y_true, y_pred, name=""):
@@ -71,8 +72,8 @@ def cap(y_true,y_pred, figsize=[15,15]):
     
     plt.figure(figsize=figsize)
     plt.plot(model_x, model_y, color='darkorange', label='CAP curve (Gini = %0.4f)' % gini)
-    plt.plot([0, 1], [0, 1], color='navy', linestyle='--', label='Best model')
-    plt.plot([0, dr, 1], [0, 1, 1], color='green', linestyle='--', label='Random model')
+    plt.plot([0, 1], [0, 1], color='navy', linestyle='--', label='Random model')
+    plt.plot([0, dr, 1], [0, 1, 1], color='green', linestyle='--', label='Best model')
     
     plt.xlim([0.0, 1.01])
     plt.ylim([0.0, 1.01])
