@@ -176,8 +176,9 @@ class Binner:
 
         # строим деревья разной глубины, ища наилучшее разбиение на чистых (без пустого) данных
         for depth in range(1, power + 1):
+
             # Строим дерево
-            dt = tree.DecisionTreeClassifier(max_depth=depth, min_samples_leaf=int(0.15 * len(clear_data['y'])))
+            dt = tree.DecisionTreeClassifier(max_depth=depth, min_samples_leaf=max(int(0.05 * len(all_set['y'])),1))
             dt.fit(clear_data['x'][:, None], clear_data['y_gr'])
             # Сохраняем полученное разбиение
             gaps = self._get_gaps(dt)
@@ -190,7 +191,7 @@ class Binner:
                                                                                                               'y_gr'] == self._bad_v])
 
             temp_mono = False
-
+            
             if self._binner_type == BinnerType.IV:
                 temp_mono = _is_monotonik(vals=gaps_counts_shares)
 
@@ -216,7 +217,6 @@ class Binner:
             # IV по всем бинам
             ivs = [(gs[0] - gs[1]) * gw for gs, gw in zip(gaps_shares, gaps_woe)]
             iv = np.sum(ivs)
-
             # Случай, когда максимизируем R2
             if self._binner_type == BinnerType.R2:
                 # создаём объект-кандидат на возвращение
