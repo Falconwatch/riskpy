@@ -62,15 +62,44 @@ class Modeler:
     def GetModelQuality(self):
         if self._fitted_model is None:
             raise Exception('Modeller is not fitted')
-            
+        fact_list = list()
+        predict_list = list()
+        color_list = list()
+        names_list = list()
+        
         train_predicted=self._fitted_model.predict(self._train)
         train_fact=self._train[self._target]        
-        test_predicted=self._fitted_model.predict(self._test)
-        test_fact=self._test[self._target]        
-        oot_predicted=self._fitted_model.predict(self._oot)
-        oot_fact=self._oot[self._target]        
         
-        return rocs([train_fact,test_fact, oot_fact],[train_predicted,test_predicted,oot_predicted],['g','r','y'],['train','test','oot'])
+        fact_list.append(train_fact)
+        predict_list.append(train_predicted)
+        color_list.append('g')
+        names_list.append('train')
+        
+        try:
+            test_predicted=self._fitted_model.predict(self._test)
+            test_fact=self._test[self._target]     
+            
+            fact_list.append(test_fact)
+            predict_list.append(test_predicted)
+            color_list.append('r')
+            names_list.append('test')
+        except:
+            test_predicted = None
+            test_fact = None
+            
+        try:
+            oot_predicted=self._fitted_model.predict(self._oot)
+            oot_fact=self._oot[self._target]  
+            
+            fact_list.append(oot_fact)
+            predict_list.append(oot_predicted)
+            color_list.append('y')
+            names_list.append('oot')
+        except:
+            oot_predicted = None
+            oot_fact = None
+        
+        return rocs(fact_list, predict_list, color_list, names_list)
     
     def Predict(self, data=None):
         if data is not None:
