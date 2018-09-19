@@ -10,6 +10,12 @@ import pandas as pd
 
 
 def roc(y_true, y_pred, name=""):
+    ''' Plot ROC curve
+        
+         Keyword arguments:
+         y_true -- true values array
+         y_pred -- predicted values array
+     '''
     fpr, tpr, _ = roc_curve(y_true=y_true, y_score=y_pred)
     roc_auc = auc(fpr, tpr)
     gini = 2 * roc_auc - 1
@@ -29,6 +35,15 @@ def roc(y_true, y_pred, name=""):
 
 
 def rocs(y_true, y_pred, colors, names, name=''):
+    ''' Plot several ROC curves
+        
+     Keyword arguments:
+     y_true -- array of true values arrays
+     y_pred -- array of predicted values arrays 
+     colors -- array of colors for curves
+     names -- array of names for curves
+     name -- name of graph (default empty string)
+     '''
     if len(y_true) != len(y_pred) or len(y_true) != len(colors):
         print(len(y_true), len(y_pred), len(colors))
         raise BaseException
@@ -54,6 +69,13 @@ def rocs(y_true, y_pred, colors, names, name=''):
     
     
 def cap(y_true,y_pred, figsize=[15,15]):
+    ''' Plot CAP curve
+        
+     Keyword arguments:
+     y_true -- true values
+     y_pred -- predicted values 
+     figsize -- size of plot figure (default [15, 15])
+     '''
     data=pd.DataFrame()
     data['FACT']=y_true
     data['PREDICTED']=y_pred    
@@ -85,9 +107,15 @@ def cap(y_true,y_pred, figsize=[15,15]):
     plt.show()
 
 
-def pr_curve(y_true, y_scores):
-    precision, recall, thresholds = precision_recall_curve(y_true=y_true, probas_pred=y_scores)
-    avg = average_precision_score(y_true, y_scores)
+def pr_curve(y_true, y_pred):
+    ''' Plot PR curve
+        
+     Keyword arguments:
+     y_true -- true values
+     y_pred -- predicted values 
+     '''
+    precision, recall, thresholds = precision_recall_curve(y_true=y_true, probas_pred=y_pred)
+    avg = average_precision_score(y_true, y_pred)
     plt.figure(figsize=[10, 10])
     plt.plot(recall, precision, lw=1.5, color='navy',
              label='Precision-Recall curve')
@@ -100,12 +128,21 @@ def pr_curve(y_true, y_scores):
     # print (recall)
 
 
-def pr_curves(y_true, y_scores, colors, names, name=''):
+def pr_curves(y_true, y_pred, colors, names, name=''):
+    ''' Plot several PR curves
+        
+     Keyword arguments:
+     y_true -- array of true values arrays
+     y_pred -- array of predicted values arrays 
+     colors -- array of colors for curves
+     names -- array of names for curves
+     name -- name of graph (default empty string)
+     '''
     plt.figure(figsize=[10, 10])
 
     for i in range(0, len(y_true)):
-        precision, recall, thresholds = precision_recall_curve(y_true=y_true[i], probas_pred=y_scores[i])
-        avg = average_precision_score(y_true[i], y_scores[i])
+        precision, recall, thresholds = precision_recall_curve(y_true=y_true[i], probas_pred=y_pred[i])
+        avg = average_precision_score(y_true[i], y_pred[i])
         plt.plot(recall, precision, lw=1.5, color=colors[i], label=names[i] + ' AUC={0:0.4f}'.format(avg))
     plt.xlabel('Recall')
     plt.ylabel('Precision')
@@ -125,6 +162,12 @@ def _autolabel(ax, heights, woes):
 
 
 def one_bin_barchart(bining, size=5):
+    ''' Plot one binning
+        
+     Keyword arguments:
+     bining -- binning to be ploted
+     size -- size of one side of the plot(default 5)
+     '''
     total_bins = np.arange(len(bining._woes))
     if len(total_bins) == 0:
         print('No binning for variable',bining._name)
@@ -151,6 +194,12 @@ def one_bin_barchart(bining, size=5):
 
 
 def binning_barchart(bins, size=3):
+    ''' Plot several binnings
+        
+     Keyword arguments:
+     bins -- binning to be ploted
+     size -- size of one side of the plot(default 3)
+     '''
     for bining in bins:
         one_bin_barchart(bining, size=size)
         
@@ -160,6 +209,19 @@ def binning_barchart(bins, size=3):
 
 def VariablesInteraction(X_train,y_train, X_test=None, y_test=None, classes=None,
                          figsize=[20,20], max_tree_depth=5, mode='full', dpath='mono'):
+    ''' Plot graph of variables interaction (TO DO: description)
+        
+     Keyword arguments:
+     X_train -- Train X data set
+     y_train -- Train y set
+     X_test -- Test X data set (default None)
+     y_test -- Test y data set (default None)
+     classes -- 
+     figsize -- 
+     max_tree_depth -- 
+     mode -- 
+     dpath -- 
+     '''
     plt.clf()
     possible_pairs=[]
     if mode=='single':

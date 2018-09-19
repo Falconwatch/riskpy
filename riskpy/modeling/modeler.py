@@ -25,6 +25,12 @@ class Modeler:
         self._sw_models=None
         
     def ExploreOneFactorImportance(self, columns, changeSign=True):
+        ''' Return factor importance for all given samples
+        
+        Keyword arguments:
+        columns -- list of factors to check
+        changeSign -- indicate whether change the sign of result (default True)
+        '''
         _multiplier=1
         if changeSign:
             multiplier=-1
@@ -46,6 +52,11 @@ class Modeler:
         return result    
         
     def Fit(self, columns): 
+        ''' Fit model
+        
+        Keyword arguments:
+        columns -- list of factors in model to fit
+        '''
         self._columns=columns
         self._fitted_model=self._fitModel(columns)
         AIC=self._fitted_model.aic
@@ -54,25 +65,61 @@ class Modeler:
     
     
     def GetModelSummary(self):
+        ''' Return fitted model summary'''
         if self._fitted_model is None:
             raise Exception('Modeller is not fitted')
         return self._fitted_model.summary()
     
     
     def GetModelQuality(self):
+        ''' Plot ROC-curves for fitted model on all given samples (train, test, out of time)'''
         if self._fitted_model is None:
             raise Exception('Modeller is not fitted')
-            
+        fact_list = list()
+        predict_list = list()
+        color_list = list()
+        names_list = list()
+        
         train_predicted=self._fitted_model.predict(self._train)
         train_fact=self._train[self._target]        
-        test_predicted=self._fitted_model.predict(self._test)
-        test_fact=self._test[self._target]        
-        oot_predicted=self._fitted_model.predict(self._oot)
-        oot_fact=self._oot[self._target]        
         
-        return rocs([train_fact,test_fact, oot_fact],[train_predicted,test_predicted,oot_predicted],['g','r','y'],['train','test','oot'])
+        fact_list.append(train_fact)
+        predict_list.append(train_predicted)
+        color_list.append('g')
+        names_list.append('train')
+        
+        try:
+            test_predicted=self._fitted_model.predict(self._test)
+            test_fact=self._test[self._target]     
+            
+            fact_list.append(test_fact)
+            predict_list.append(test_predicted)
+            color_list.append('r')
+            names_list.append('test')
+        except:
+            test_predicted = None
+            test_fact = None
+            
+        try:
+            oot_predicted=self._fitted_model.predict(self._oot)
+            oot_fact=self._oot[self._target]  
+            
+            fact_list.append(oot_fact)
+            predict_list.append(oot_predicted)
+            color_list.append('y')
+            names_list.append('oot')
+        except:
+            oot_predicted = None
+            oot_fact = None
+        
+        return rocs(fact_list, predict_list, color_list, names_list)
     
     def Predict(self, data=None):
+        ''' Predict with fitted model
+        
+         Keyword arguments:
+         data -- data to make predictions, if None - predict on all given samples: train, test, oot (default None)
+        '''
         if data is not None:
             fact=[data[self._target].values]
             predict=[self._fitted_model.predict(data)]
@@ -83,6 +130,7 @@ class Modeler:
             return fact, predict
     
     def VIF(self):
+        ''' Evaluate VIF for factors in model'''
         if self._fitted_model is None or self._columns is None:
             raise Exception('Modeller is not fitted')
         vifs=vif(self._train[self._columns].dropna())
@@ -93,6 +141,14 @@ class Modeler:
     
     
     def StepwiseSelection(self, factors, p_in=1, p_out=0.1, kind='class'):
+        ''' Do stepwise selection
+        
+         Keyword arguments:
+         factors -- full factors list for stepwise selection
+         p_in -- p-value to include (default 1)
+         p_out -- p-value to exclude (default 0.1)
+         kind -- type of regression, not fully implemented (default 'class')
+        '''
         log=[]
         models=[]
         
@@ -137,6 +193,11 @@ class Modeler:
         return log, models
     
     def StepwiseSummary(self, figure_size=[10,10]):
+        ''' Return stepwise selection results and plot stepwise path
+        
+         Keyword arguments:
+         figure_size -- size of plot figure (default [10,10])
+        '''
         if self._sw_log is None or self._sw_models is None:
             raise Exception('Stepwise selection was not performed')
         
