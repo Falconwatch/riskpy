@@ -23,7 +23,7 @@ def pd_gini_interval(fact, predicted):
 
 
 # джини и ДИ во времени
-def pd_gini_in_time(data, fact_name, pred_name, time_name, name=""):
+def pd_gini_in_time(data, fact_name='y_fact', pred_name='y_pred', time_name='period', name='', figsize=(17, 10)):
     """
     Plot gini's coefficient and its confidence interval
     :param data: Dataframe
@@ -31,6 +31,7 @@ def pd_gini_in_time(data, fact_name, pred_name, time_name, name=""):
     :param pred_name: Name of column with predicted values
     :param time_name: Name of column with datetime values
     :param name: Name for plot title
+    :param figsize: figsize for the plot
     """
     gini_data = data.dropna().copy()
     times = sorted(gini_data[time_name].unique(), ascending=True)
@@ -47,8 +48,8 @@ def pd_gini_in_time(data, fact_name, pred_name, time_name, name=""):
     ginis_up = [mg[1][2] for mg in times_gini]
     ginis_down = [mg[1][0] for mg in times_gini]
 
-    plt.figure(figsize=[17, 10])
-    plt.title('Изменение Gini во времени и его доверительный интервал' + name)
+    plt.figure(figsize=figsize)
+    plt.title('Изменение Gini во времени и его доверительный интервал' + ' ' + name)
     plt.fill_between(x=range(len(dates)), y1=0, y2=0.4, color='red', alpha=0.7)
     plt.fill_between(x=range(len(dates)), y1=0.4, y2=0.6, color='yellow', alpha=0.7)
     plt.fill_between(x=range(len(dates)), y1=0.6, y2=1, color='green', alpha=0.7)
