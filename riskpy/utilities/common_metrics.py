@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
 from ..graphs import graphs
 import numpy as np
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, roc_auc_score
 import math
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from math import log
@@ -18,9 +18,10 @@ def gini(y_true, y_pred):
     :param y_pred: Predicted values
     :return: Gini's coefficient
     """
-    fpr, tpr, _ = roc_curve(y_true=y_true, y_score=y_pred)
-    roc_auc = auc(fpr, tpr)
-    g = 2 * roc_auc - 1
+    g = roc_auc_score(y_true=y_true, y_score=y_pred) * 2 - 1
+    # fpr, tpr, _ = roc_curve(y_true=y_true, y_score=y_pred)
+    # roc_auc = auc(fpr, tpr)
+    # g = 2 * roc_auc - 1
     return g
 
 
