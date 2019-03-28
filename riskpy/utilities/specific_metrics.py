@@ -33,11 +33,11 @@ def pd_gini_in_time(data, fact_name, pred_name, time_name, name=""):
     :param name: Name for plot title
     """
     gini_data = data.dropna().copy()
-    times = gini_data[time_name].unique()
+    times = sorted(gini_data[time_name].unique(), ascending=True)
     times_gini = list()
 
     for time in times:
-        predicted = gini_data.loc[gini_data[ time_name ] == time, pred_name]
+        predicted = gini_data.loc[gini_data[time_name] == time, pred_name]
         fact = gini_data.loc[gini_data[time_name] == time, fact_name]
         gini_int = pd_gini_interval(fact, predicted)
         times_gini.append([time, gini_int])
