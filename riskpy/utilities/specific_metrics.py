@@ -34,19 +34,18 @@ def pd_gini_in_time(data, fact_name='y_fact', pred_name='y_pred', time_name='per
     :param figsize: figsize for the plot
     """
     gini_data = data.dropna().copy()
-    times = sorted(gini_data[time_name].unique(), ascending=True)
+    dates = list()
+    ginis = list()
     times_gini = list()
 
-    for time in times:
+    for time in sorted(gini_data[time_name].unique(), ascending=True):
         predicted = gini_data.loc[gini_data[time_name] == time, pred_name]
         fact = gini_data.loc[gini_data[time_name] == time, fact_name]
         gini_int = pd_gini_interval(fact, predicted)
-        times_gini.append([time, gini_int])
-
-    dates = [mg[0] for mg in times_gini]
-    ginis = [mg[1][1] for mg in times_gini]
-    ginis_up = [mg[1][2] for mg in times_gini]
-    ginis_down = [mg[1][0] for mg in times_gini]
+        times.append([time, gini_int])
+        ginis.append(gini_int[1])
+        ginis_up = gini_int[2]
+        ginis_down = gini_int[0]
 
     plt.figure(figsize=figsize)
     plt.title('Изменение Gini во времени и его доверительный интервал' + ' ' + name)
