@@ -1,0 +1,148 @@
+<application>
+  <component name="ProjectJdkTable">
+    <jdk version="2">
+      <name value="Python 3.6" />
+      <type value="Python SDK" />
+      <homePath value="/anaconda3/bin/python3.6" />
+      <roots>
+        <classPath>
+          <root type="composite">
+            <root url="file:///anaconda3/lib/python3.6" type="simple" />
+            <root url="file:///anaconda3/lib/python3.6/lib-dynload" type="simple" />
+            <root url="file:///anaconda3/lib/python3.6/site-packages" type="simple" />
+            <root url="file:///anaconda3/lib/python3.6/site-packages/aeosa" type="simple" />
+            <root url="file://$USER_HOME$/Library/Caches/PyCharm2018.3/python_stubs/1978755681" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/python-skeletons" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/2and3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/third_party/3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/third_party/2and3" type="simple" />
+          </root>
+        </classPath>
+        <sourcePath>
+          <root type="composite" />
+        </sourcePath>
+      </roots>
+      <additional />
+    </jdk>
+    <jdk version="2">
+      <name value="Python 3.6 (business_calculator)" />
+      <type value="Python SDK" />
+      <version value="Python 3.6.5" />
+      <homePath value="$USER_HOME$/venv/business_calculator/bin/python" />
+      <roots>
+        <classPath>
+          <root type="composite">
+            <root url="file:///anaconda3/lib/python3.6" type="simple" />
+            <root url="file:///anaconda3/lib/python3.6/lib-dynload" type="simple" />
+            <root url="file://$USER_HOME$/venv/business_calculator/lib/python3.6/site-packages" type="simple" />
+            <root url="jar://$USER_HOME$/venv/business_calculator/lib/python3.6/site-packages/setuptools-28.8.0-py3.6.egg!/" type="simple" />
+            <root url="file://$USER_HOME$/Library/Caches/PyCharm2018.1/python_stubs/-1144189392" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/python-skeletons" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3.6" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3.5" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3.4" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3.3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/2and3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/third_party/3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/third_party/2and3" type="simple" />
+          </root>
+        </classPath>
+        <sourcePath>
+          <root type="composite" />
+        </sourcePath>
+      </roots>
+      <additional ASSOCIATED_PROJECT_PATH="$USER_HOME$/PycharmProjects/business_calculator" />
+    </jdk>
+    <jdk version="2">
+      <name value="Python 3.6 (untitled)" />
+      <type value="Python SDK" />
+      <version value="Python 3.6.5" />
+      <homePath value="$USER_HOME$/venv/untitled/bin/python" />
+      <roots>
+        <classPath>
+          <root type="composite">
+            <root url="file:///anaconda3/lib/python3.6" type="simple" />
+            <root url="file:///anaconda3/lib/python3.6/lib-dynload" type="simple" />
+            <root url="file://$USER_HOME$/venv/untitled/lib/python3.6/site-packages" type="simple" />
+            <root url="jar://$USER_HOME$/venv/untitled/lib/python3.6/site-packages/setuptools-28.8.0-py3.6.egg!/" type="simple" />
+            <root url="file://$USER_HOME$/venv/untitled/lib/python3.6/site-packages/pip-9.0.1-py3.6.egg" type="simple" />
+            <root url="file://$USER_HOME$/Library/Caches/PyCharm2018.1/python_stubs/1518542768" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/python-skeletons" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3.6" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3.5" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3.4" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3.3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/2and3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/third_party/3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/third_party/2and3" type="simple" />
+          </root>
+        </classPath>
+        <sourcePath>
+          <root type="composite" />
+        </sourcePath>
+      </roots>
+      <additional ASSOCIATED_PROJECT_PATH="$USER_HOME$/PycharmProjects/untitled" />
+    </jdk>
+    <jdk version="2">
+      <name value="Python 3.6 (mytelegbots)" />
+      <type value="Python SDK" />
+      <version value="Python 3.6.5" />
+      <homePath value="$USER_HOME$/venv/mytelegbots/bin/python" />
+      <roots>
+        <classPath>
+          <root type="composite">
+            <root url="file:///anaconda3/lib/python3.6" type="simple" />
+            <root url="file:///anaconda3/lib/python3.6/lib-dynload" type="simple" />
+            <root url="file://$USER_HOME$/venv/mytelegbots/lib/python3.6/site-packages" type="simple" />
+            <root url="jar://$USER_HOME$/venv/mytelegbots/lib/python3.6/site-packages/setuptools-28.8.0-py3.6.egg!/" type="simple" />
+            <root url="file://$USER_HOME$/venv/mytelegbots/lib/python3.6/site-packages/pip-9.0.1-py3.6.egg" type="simple" />
+            <root url="file://$USER_HOME$/Library/Caches/PyCharm2018.1/python_stubs/-1366727500" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/python-skeletons" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3.6" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3.5" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3.4" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3.3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/2and3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/third_party/3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/third_party/2and3" type="simple" />
+          </root>
+        </classPath>
+        <sourcePath>
+          <root type="composite" />
+        </sourcePath>
+      </roots>
+      <additional ASSOCIATED_PROJECT_PATH="$USER_HOME$/PycharmProjects/mytelegbots" />
+    </jdk>
+    <jdk version="2">
+      <name value="Python 3.6 (mytelegbots) (2)" />
+      <type value="Python SDK" />
+      <version value="Python 3.6.5" />
+      <homePath value="$USER_HOME$/venv/mytelegbots/bin/python" />
+      <roots>
+        <classPath>
+          <root type="composite">
+            <root url="file:///anaconda3/lib/python3.6" type="simple" />
+            <root url="file:///anaconda3/lib/python3.6/lib-dynload" type="simple" />
+            <root url="file://$USER_HOME$/venv/mytelegbots/lib/python3.6/site-packages" type="simple" />
+            <root url="jar://$USER_HOME$/venv/mytelegbots/lib/python3.6/site-packages/setuptools-39.1.0-py3.6.egg!/" type="simple" />
+            <root url="file://$USER_HOME$/venv/mytelegbots/lib/python3.6/site-packages/pip-10.0.1-py3.6.egg" type="simple" />
+            <root url="file://$USER_HOME$/Library/Caches/PyCharm2018.3/python_stubs/-1366727500" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/python-skeletons" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/2and3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/third_party/3" type="simple" />
+            <root url="file://$APPLICATION_HOME_DIR$/helpers/typeshed/third_party/2and3" type="simple" />
+          </root>
+        </classPath>
+        <sourcePath>
+          <root type="composite" />
+        </sourcePath>
+      </roots>
+      <additional ASSOCIATED_PROJECT_PATH="$USER_HOME$/PycharmProjects/mytelegbots" />
+    </jdk>
+  </component>
+</application>

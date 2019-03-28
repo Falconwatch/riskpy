@@ -1,0 +1,12 @@
+<application>
+  <component name="NodeJsLocalInterpreters">
+    <local-interpreter path="/usr/local/bin/node" />
+  </component>
+  <component name="PyTestFrameworkService">
+    <option name="SDK_TO_PYTEST">
+      <map>
+        <entry key="/anaconda3/bin/python3.6" value="true" />
+      </map>
+    </option>
+  </component>
+</application>
