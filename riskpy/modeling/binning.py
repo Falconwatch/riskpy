@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
 import math as math
+import pickle
 from sklearn import tree
 from sklearn.linear_model import LinearRegression
 from enum import Enum
-import pickle
 
 
 class BinnerType(Enum):
@@ -19,6 +19,7 @@ class Binner:
     _binner_type = BinnerType.IV
     _fitted_bins = None
     _target_variable = None
+    _exclude = []
 
     def __init__(self, binner_type=BinnerType.IV, good_mark=0, bad_mark=1):
         """
@@ -34,7 +35,7 @@ class Binner:
         self._binner_type = binner_type
 
     # Фитинг биннера к данным
-    def fit(self, data, target, power=5, binning_settings=()):
+    def fit(self, data, target, power=5, binning_settings=(), exclude=[]):
         """
         Fit binner to data
         :param data: Source data
@@ -44,11 +45,12 @@ class Binner:
         :return:
         """
         self._target_variable = target
+        self._exclude = exclude
         bin_data = list()
-        for column in data.columns[data.columns != target]:
+        for column in [x for x in data.columns if x not in [target, ] + self._exclude]:
             variable_settings = None
             settings_list = [bs for bs in binning_settings if bs._variable_name == column]
-            if (len(settings_list) == 1):
+            if len(settings_list) == 1:
                 variable_settings = settings_list[0]
             x = data[column]
             y = data[target]
@@ -59,20 +61,20 @@ class Binner:
         return bin_data
 
     # Применение бинов к данным - возвращает WOE факторы
-    def transform(self, data_in, exclude=()):
+    def transform(self, data_in, exclude=[]):
         """
         Transform data
         :param data_in: Data to be transformed
         :param exclude: List of excluded variables (will be ignored during transformation)
         :return: Transformed data
         """
-        if self._fitted_bins == None or self._target_variable == None:
+        if self._fitted_bins is None or self._target_variable is None:
             raise Exception("Binner is not fitted!")
 
         target = self._target_variable
         data_splitting = self._fitted_bins
         data = data_in.copy()
-        for ds in [bw for bw in data_splitting if (bw._iv >= 0.00) & (str(bw._name) not in " ".join(exclude))]:
+        for ds in [bw for bw in data_splitting if (bw._iv >= 0.00) & (str(bw._name) not in " ".join(exclude + self._exclude))]:
             var = str(ds._name)
             bins = [a for a in zip(ds._gaps, ds._woes)]
             # not nan
@@ -86,7 +88,7 @@ class Binner:
                 data.loc[np.isnan(data[var]), var + "_woe"] = [b for b in bins if b[0][0] is None][0][1]
             except:
                 pass
-        learn_columns = [col for col in data.columns if ('woe' in col)]
+        learn_columns = [col for col in data.columns if ('woe' in col)] + self._exclude
         learn_columns.append(target)
         learn_data = data[learn_columns]
         return learn_data
@@ -178,7 +180,7 @@ class Binner:
         for depth in range(1, power + 1):
 
             # Строим дерево
-            dt = tree.DecisionTreeClassifier(max_depth=depth, min_samples_leaf=max(int(0.05 * len(all_set['y'])),1))
+            dt = tree.DecisionTreeClassifier(max_depth=depth, min_samples_leaf=max(int(0.1 * len(all_set['y'])),1))
             dt.fit(clear_data['x'][:, None], clear_data['y_gr'])
             # Сохраняем полученное разбиение
             gaps = self._get_gaps(dt)

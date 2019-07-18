@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
-from ..graphs import graphs
 import numpy as np
-from sklearn.metrics import roc_curve, auc
+import pandas as pd
+from sklearn.metrics import roc_auc_score
 import math
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from math import log
@@ -18,10 +18,10 @@ def gini(y_true, y_pred):
     :param y_pred: Predicted values
     :return: Gini's coefficient
     """
-    fpr, tpr, _ = roc_curve(y_true=y_true, y_score=y_pred)
-    roc_auc = auc(fpr, tpr)
-    g = 2 * roc_auc - 1
-    return g
+    try:
+        return roc_auc_score(y_true=y_true, y_score=y_pred) * 2 - 1
+    except:
+        return np.nan
 
 
 # Вычисление VIF
@@ -38,43 +38,51 @@ def vif(data):
 
 
 # Вычисление PSI
-def psi(data1, data2):
+def psi(data1, data2, target_column=None, zone_borders=[0.1, 0.2]):
     """
     Calculate Population Stability Index (PSI)
+
     :param data1: First dataset
     :param data2: Second dataset
-    :return: Array of PSIs in format: column, PSI
+    :param target_column: Name of target columns (optional)
+    :param zone_borders: validation test borders: under the first - green, above the second - red, between - yellow
+    :return: Table of PSIs
     """
     result = []
     columns = [col for col in data2.columns if col in data1.columns]
-    for column in columns:
-        shares1 = data1[column].value_counts() / len(data1[column])
-        shares2 = data2[column].value_counts() / len(data2[column])
-        dif = shares1 - shares2
-        ln = (shares1 / shares2).apply((lambda x: log(x)))
-        psi = dif * ln
-        a = psi.sum()
-        result.append([column, a])
-        # print (column,'{0:.40f}'.format(a))
+    if target_column is None:
+        for column in columns:
+            shares1 = data1[column].value_counts() / len(data1[column])
+            shares2 = data2[column].value_counts() / len(data2[column])
+            dif = shares1 - shares2
+            ln = (shares1 / shares2).apply((lambda x: log(x)))
+            psi = dif * ln
+            a = psi.sum()
+            result.append([column, a])
+        result = pd.DataFrame({'Column': [x[0] for x in result],'PSI': [x[1] for x in result]})
+    else:
+        target_unique_values = list(set(data1[target_column].unique()).union(set(data1[target_column].unique())))
+        if len(target_unique_values) > 2:
+            raise Exception('Target must be binary')
+        for target_value in target_unique_values:
+            for column in columns:
+                shares1 = data1.loc[data1[target_column] == target_value, column].value_counts() / \
+                          len(data1.loc[data1[target_column] == target_value, column])
+                shares2 = data2.loc[data2[target_column] == target_value, column].value_counts() / \
+                          len(data2.loc[data2[target_column] == target_value, column])
+                dif = shares1 - shares2
+                ln = (shares1 / shares2).apply((lambda x: log(x)))
+                psi = dif * ln
+                a = psi.sum()
+                result.append([column, target_value, a])
+        result = pd.DataFrame({
+                                'Column': [x[0] for x in result],
+                                'Target': [x[1] for x in result],
+                                'PSI': [x[2] for x in result]}).pivot(index='Column', columns='Target', values='PSI')
+    result.style.applymap(
+        lambda x: 'background-color: red' if x > zone_borders[1] else ('background-color: yellow' if x > zone_borders[0] else 'background-color: green'),
+        subset=['PSI'])
     return result
-
-
-# информация по дескриминирующей силе: джини и рок кривая
-def gini_info(data, fact_name, pred_name, name=""):
-    """
-    Calculate gini and plot ROC-curve
-    :param data: Dataframe
-    :param fact_name: Name of the column with fact values
-    :param pred_name: Name of the column with predicted values
-    :param name: Name for the plot's title
-    :return:
-    """
-    gini_data = data.dropna().copy()
-    predicted = gini_data[pred_name]
-    fact = gini_data[fact_name] > np.average(gini_data[fact_name])
-    g = gini(y_true=fact, y_pred=predicted)
-    graphs.roc(y_true=fact, y_pred=predicted, name=' for ' + name)
-    return g
 
 
 def HHI_dataset(data):
@@ -104,7 +112,7 @@ def mean_CI(data, alpha):
     Calculate confidence interval for mean
     :param data: Sample
     :param alpha: Confidence level
-    :return: CI and average value
+    :return: CI and average value in format [lowest, avg, highest]
     """
     n = len(data)
     t_95 = t._ppf((alpha + 1) / 2, df=n - 1)
