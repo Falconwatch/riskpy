@@ -5,6 +5,7 @@ import pickle
 from sklearn import tree
 from sklearn.linear_model import LinearRegression
 from enum import Enum
+import multiprocessing as mp
 
 
 class BinnerType(Enum):
@@ -13,14 +14,6 @@ class BinnerType(Enum):
 
 
 class Binner:
-    # флаги хороших/плохих
-    _bad_v = 1
-    _good_v = 0
-    _binner_type = BinnerType.IV
-    _fitted_bins = None
-    _target_variable = None
-    _exclude = []
-
     def __init__(self, binner_type=BinnerType.IV, good_mark=0, bad_mark=1):
         """
         Create binner instance
@@ -33,30 +26,39 @@ class Binner:
         self._good_v = good_mark
         self._bad_v = bad_mark
         self._binner_type = binner_type
+        self._fitted_bins = None
+        self._target_variable = None
+        self._exclude = []
 
     # Фитинг биннера к данным
-    def fit(self, data, target, power=5, binning_settings=(), exclude=[]):
+    def fit(self, data, target, power=5, binning_settings=(), exclude=[], verbose=False, n_jobs=-1):
         """
         Fit binner to data
         :param data: Source data
         :param target: Target variable
         :param power: Max depth of splitting
         :param binning_settings: Additional parameters for binning
+        :param exclude: Columns in table which are not for binning
         :return:
         """
         self._target_variable = target
         self._exclude = exclude
         bin_data = list()
-        for column in [x for x in data.columns if x not in [target, ] + self._exclude]:
-            variable_settings = None
+
+        def find_settings(column_name):
             settings_list = [bs for bs in binning_settings if bs._variable_name == column]
             if len(settings_list) == 1:
                 variable_settings = settings_list[0]
-            x = data[column]
-            y = data[target]
-            w = self._bin(x, y, settings=variable_settings, power=power)
-            w._name = column
-            bin_data.append(w)
+                return variable_settings
+            return None
+
+        args = [(data[column], data[target], column, power, find_settings(column)) for column in [x for x in data.columns if x not in [target, ] + self._exclude]]
+
+        pool = mp.Pool()
+        bin_data = pool.starmap(self._bin, args)
+        pool.close()
+        pool.terminate()
+
         self._fitted_bins = bin_data
         return bin_data
 
@@ -133,9 +135,9 @@ class Binner:
             pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
 
     # Разбиение на бины одной переменной
-    def _bin(self, x, y, power=2, settings=None):
+    def _bin(self, x, y, variable_name, power=2, settings=None):
         check_mono = True
-        if not settings == None:
+        if settings is not None:
             check_mono = settings._monotone
 
         # инициализируем результаты
@@ -253,6 +255,7 @@ class Binner:
         best_b = Binning(best_gaps, best_gaps_woe, best_iv, best_gaps_shares, best_gaps_counts, gini,
                          best_gaps_counts_shares, best_gaps_avg, best_hhi)
         best_b._r2 = best_r2
+        best_b._name = variable_name
         return best_b
 
     # Вытаскиваем промежутки из дерева
