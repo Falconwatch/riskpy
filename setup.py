@@ -1,4 +1,5 @@
-from setuptools import setup
+from setuptools import setup, find_packages
+from os.path import join, dirname
 
 setup(
     name='riskpy',
@@ -8,6 +9,19 @@ setup(
     author='Igor Shcherbakov',
     author_email='iashcherbakov@yandex.ru',
     license='MIT',
-    packages=['riskpy'],
+    packages=find_packages(),
     keywords=['modeling', 'risks', 'statistics'],  # arbitrary keywords
-    zip_safe=False)
+    zip_safe=False,
+    test_suite='tests',
+    install_requires=[
+        'numpy',
+        'pandas',
+        'scikit-learn',
+        'matplotlib',
+        'statsmodels',
+        'seaborn',
+        'scipy'
+
+    ]
+)
+
