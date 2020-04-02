@@ -5,7 +5,7 @@ class ValidationPipelineElement():
     def __init__(self, target_name, score_name, ):
         self.__target_name = target_name
         self.__score_name = score_name
-        self.
+        # self.
 
 
 class ValidationPipeline():

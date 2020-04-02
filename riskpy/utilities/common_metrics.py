@@ -38,7 +38,7 @@ def vif(data):
 
 
 # Вычисление PSI
-def psi(data1, data2, target_column=None, zone_borders=[0.1, 0.2]):
+def psi(data1, data2, target_column=None, zone_borders=(0.1, 0.2)):
     """
     Calculate Population Stability Index (PSI)
 
@@ -59,7 +59,7 @@ def psi(data1, data2, target_column=None, zone_borders=[0.1, 0.2]):
             psi = dif * ln
             a = psi.sum()
             result.append([column, a])
-        result = pd.DataFrame({'Column': [x[0] for x in result],'PSI': [x[1] for x in result]})
+        result = pd.DataFrame({'Column': [x[0] for x in result], 'PSI': [x[1] for x in result]})
     else:
         target_unique_values = list(set(data1[target_column].unique()).union(set(data1[target_column].unique())))
         if len(target_unique_values) > 2:
@@ -76,35 +76,43 @@ def psi(data1, data2, target_column=None, zone_borders=[0.1, 0.2]):
                 a = psi.sum()
                 result.append([column, target_value, a])
         result = pd.DataFrame({
-                                'Column': [x[0] for x in result],
-                                'Target': [x[1] for x in result],
-                                'PSI': [x[2] for x in result]}).pivot(index='Column', columns='Target', values='PSI')
+            'Column': [x[0] for x in result],
+            'Target': [x[1] for x in result],
+            'PSI': [x[2] for x in result]}).pivot(index='Column', columns='Target', values='PSI')
     result.style.applymap(
-        lambda x: 'background-color: red' if x > zone_borders[1] else ('background-color: yellow' if x > zone_borders[0] else 'background-color: green'),
+        lambda x: "background-color: red" if x > zone_borders[1] else ("background-color: yellow" if x > zone_borders[0] else "background-color: green"),
         subset=['PSI'])
     return result
 
 
-def HHI_dataset(data):
+def HHI_dataset(data, adj = True, j=26):
     """
     Calculate HHI for all variable in dataframe
     :param data: Dataframe
+    :param adj: Считать ли скорректированный индекс или обычный
+    :param j: Количество бакетов в целевом разбиении. Применяется при рассчёте скорретированного индекса
     :return: Array in format: Variable - HHI
     """
     result = ()
     for column in data.columns:
-        result.append([column, ], HHI_row(data[column]))
+        result.append([column, ], HHI_arr(data[column], adj, j))
     return result
 
 
-def HHI_row(row):
+def HHI_arr(arr, adj = True, j=26):
     """
     Calculate HHI for Series
     :param row: Data series
+    :param adj: Считать ли скорректированный индекс или обычный
+    :param j: Количество бакетов в целевом разбиении. Применяется при рассчёте скорретированного индекса
     :return: HHI
     """
-    return np.sum((row.value_counts() / len(row)) ** 2)
-
+    _, counts = np.unique(arr, return_counts=True)
+    hhi = np.sum((counts/np.sum(counts)) ** 2)
+    if adj:
+        return (hhi-1/j)/(1-1/j)
+    else:
+        return hhi
 
 # Доверительный интервал для среднего
 def mean_CI(data, alpha):

@@ -7,12 +7,9 @@ from sklearn.model_selection import StratifiedKFold
 from riskpy.utilities.common_metrics import gini, vif
 from riskpy.graphs.graphs import rocs
 from statsmodels.stats.outliers_influence import variance_inflation_factor
+from sklearn.linear_model import SGDClassifier
 
 
-# vif = VIF(threshold=5).fit(X_train) - if verbose=True then printing columns to be dropped
-# X_train = vif.transform(X_train)
-# X_test = vif.transform(X_test)
-# X_oot = vif.transform(X_oot)
 class VIF:
     def __init__(self, threshold=5.0):
         self.threshold = threshold
@@ -60,10 +57,11 @@ class VIF:
 # X_test = cor.transform(X_test)
 # X_oot = cor.transform(X_oot)
 class Correlations:
-    ''' Calculate correlations between factors
+    """ Calculate correlations between factors
         Keyword arguments:
         threshold -- a correlation coefficient value above which is considered high enough to remove factor
-    '''
+    """
+
     def __init__(self, threshold=0.95):
         self._threshold = threshold
         self._col_to_del = None
@@ -71,7 +69,7 @@ class Correlations:
         self._init_cols = None
         self._drop_cols = None
 
-    def fit(self, train_dataset, drop_cols=[], verbose=True, plot=False):
+    def fit(self, train_dataset, drop_cols=[], verbose=True, plot=False, **kwargs):
         self._drop_cols = list(set(drop_cols).intersection(list(train_dataset.columns.tolist())))
         self._init_cols = train_dataset.drop(self._drop_cols, axis=1).columns.tolist()
         train_corr = train_dataset.drop(self._drop_cols, axis=1).corr()
@@ -82,9 +80,9 @@ class Correlations:
             print('Fitted train dataset. {} columns to be removed'.format(len(self._col_to_del)))
         if plot:
             import seaborn as sns
-            plt.figure(figsize=[20, 20])
+            plt.figure(figsize=kwargs.get('figsize', (20, 20)))
             sns.heatmap(train_corr)
-            plt.title('Корреляционная матрица')
+            plt.title(kwargs.get('title', 'Корреляционная матрица'))
             plt.show()
         return self
 
@@ -95,10 +93,11 @@ class Correlations:
 
 
 class Modeler:
-    def __init__(self, train_dataset=None, test_dataset=None, target=None, oot_dataset=None,  period=None, kind='class'):
+    def __init__(self, train_dataset=None, test_dataset=None, target=None, oot_dataset=None,  period=None, kind='class', mode='StatsModels'):
         # Global vars
         self._kind = kind
         self._multiplier = -1
+        self._mode = mode
         # Datasets
         self._train = train_dataset
         self._test = test_dataset
@@ -118,32 +117,51 @@ class Modeler:
         self._sw_log = None
         self._sw_models = None
 
-    def fit(self, columns, verbose=True, disp=False):
-        ''' Fit model
+    def fit(self, columns, verbose=True, disp=False, **kwargs):
+        """ Fit model
         Keyword arguments:
         columns -- list of factors in model to fit
-        '''
-        if self._train is not None:
-            raise Exception('Train dataset has not benn added')
-        if self._kind == 'class':
-            self._fitted_model = sm.Logit(self._train[self._target].values, sm.add_constant(self._train[columns])).fit(disp=disp)
-        else:
-            self._fitted_model = sm.OLS(self._train[self._target].values, sm.add_constant(self._train[columns])).fit(disp=disp)
+        """
+        if self._train is None:
+            raise Exception('Train dataset has not been added')
+        if self._kind != 'class':
+            raise Exception('Only classification is supported')
         self.classes = self._train[self._target].values
         self._columns = columns
-        self.aic = self._fitted_model.aic
-        self.bic = self._fitted_model.bic
-        if verbose:
-            print('Model has been fitted on {} columns. AIC: {}, BIC: {}.'.format(len(columns), self.aic, self.bic))
-        return self._fitted_model
+        if self._mode == 'StatsModels':
+            self._fitted_model, self.coefs = self._fit(self._train[self._columns], self.classes, disp=disp, **kwargs)
+            self.aic = self._fitted_model.aic
+            self.bic = self._fitted_model.bic
+            if verbose:
+                print('Model has been fitted on {} columns. AIC: {}, BIC: {}.'.format(len(self._columns), self.aic, self.bic))
+        if self._mode == 'sklearn':
+            self._fitted_model, self.coefs = self._fit(self._train[self._columns], self.classes, disp=disp, **kwargs)
+            if verbose:
+                print('Model has been fitted on {} columns.'.format(len(self._columns)))
+        return self
+
+    def _fit(self, X, y, disp=False, **kwargs):
+        """ Fit model
+        Keyword arguments:
+        columns -- list of factors in model to fit
+        """
+        if self._mode == 'StatsModels':
+            fitted_model = sm.Logit(y, sm.add_constant(X)).fit(disp=disp)
+            coefs = fitted_model.params[1:]
+        if self._mode == 'sklearn':
+            kwargs['loss'] = 'log'
+            kwargs['n_jobs'] = -1
+            fitted_model = SGDClassifier(**kwargs).fit(X, y)
+            coefs = fitted_model.coef_
+        return fitted_model, coefs
 
     def predict(self, data='train', facts=False):
-        ''' Predict with fitted model
+        """ Predict with fitted model
          Keyword arguments:
          data -- data to make predictions, if None - predict on all given samples: train, test, oot (default None)
-        '''
-        if self._columns is not None:
-            raise Exception('Modeler has not benn fitted')
+        """
+        if self._fitted_model is None:
+            raise Exception('Modeler has not been fitted')
         if data in ['train', 'TRAIN', 'Train']:
             if facts:
                 return self._train[self._target].values, self._fitted_model.predict(self._train[self._columns])
@@ -159,61 +177,83 @@ class Modeler:
         else:
             return self._fitted_model.predict(data[self._columns])
 
-    def get_score(self, data='train'):
+    def get_score(self, data='train', plot=False):
         if data in ['train', 'TRAIN', 'Train']:
-            return gini(y_true=self._train[self._target], y_pred=self.predict(data='train'))
+            fact_list = [self._train[self._target]]
+            predict_list = [self.predict(data='train')]
+            gini_values = [gini(y_true=fact_list[0], y_pred=predict_list[0])]
+            names_list = ['Train']
         elif data in ['test', 'TEST', 'Test']:
-            return gini(y_true=self._train[self._target], y_pred=self.predict(data='test'))
+            fact_list = [self._test[self._target]]
+            predict_list = [self.predict(data='test')]
+            gini_values = [gini(y_true=fact_list[0], y_pred=predict_list[0])]
+            names_list = ['Test']
         elif data in ['oot', 'OOT', 'Oot']:
-            return gini(y_true=self._train[self._target], y_pred=self.predict(data='oot'))
-        else:
-            return gini(y_true=data[self._target], y_pred=self.predict(data=data))
-
-    def cv_score(self, n_splits=3):
-        if self._columns is not None:
-            raise Exception('Modeler has not benn fitted')
-        skf = StratifiedKFold(n_splits=n_splits).split(
-            self._train[self._columns].append(self._test[self._columns]),
-            self._train[self._target].append(self._test[self._target]))
-
-        ginis = []
-        for train_index, test_index in skf:
-            if self._kind == 'class':
-                fitted_model = sm.Logit(
-                    self._train[self._target].append(self._test[self._target])[train_index].values,
-                    sm.add_constant(
-                        self._train[self._columns].append(self._test[self._columns])[train_index]
-                    )).fit(disp=False)
+            fact_list = [self._oot[self._target]]
+            predict_list = [self.predict(data='oot')]
+            gini_values = [gini(y_true=fact_list[0], y_pred=predict_list[0])]
+            names_list = ['OOT']
+        elif data in ['all', 'ALL', 'All']:
+            if self._train is not None and self._test is not None and self._oot is not None:
+                fact_list = [self._train[self._target], self._test[self._target], self._oot[self._target]]
+                predict_list = [self.predict(data='train'), self.predict(data='test'), self.predict(data='oot')]
+                gini_values = [
+                    gini(y_true=fact_list[0], y_pred=predict_list[0]),
+                    gini(y_true=fact_list[1], y_pred=predict_list[1]),
+                    gini(y_true=fact_list[2], y_pred=predict_list[2])
+                ]
+                names_list = ['Train', 'Test', 'OOT']
+            elif self._train is not None and self._test is not None:
+                fact_list = [self._train[self._target], self._test[self._target]]
+                predict_list = [self.predict(data='train'), self.predict(data='test')]
+                gini_values = [
+                    gini(y_true=fact_list[0], y_pred=predict_list[0]),
+                    gini(y_true=fact_list[1], y_pred=predict_list[1])]
+                names_list = ['Train', 'Test']
             else:
-                fitted_model = sm.OLS(
-                    self._train[self._target].append(self._test[self._target])[train_index].values,
-                    sm.add_constant(
-                        self._train[self._columns].append(self._test[self._columns])[train_index]
-                    )).fit(disp=False)
-            ginis.append(
-                gini(
-                    y_true=self._train[self._target].append(self._test[self._target])[train_index],
-                    y_pred=fitted_model.predict(self._train[self._columns].append(self._test[self._columns])[test_index])))
-        return ginis
+                raise Exception('Necessary data: train - test or train-test-oot')
+        else:
+            fact_list = [self._train[self._target]]
+            predict_list = [self.predict(data='train')]
+            gini_values = [gini(y_true=data[self._target], y_pred=self.predict(data=data))]
+        if plot:
+            rocs(fact_list, predict_list, ['g', 'r', 'b'], names_list)
+        return gini_values
+
+    def cv_score(self, columns, n_splits=5):
+        df = self._train.append(self._test).reset_index(drop=True)
+        X = df[columns]
+        y = df[self._target]
+        skf = StratifiedKFold(n_splits=n_splits).split(X, y)
+        ginis, coefs = [], []
+        for train_index, test_index in skf:
+            X_train = X.loc[train_index, :]
+            y_train = y.loc[train_index]
+            X_test = X.loc[test_index, :]
+            y_test = y.loc[test_index]
+            fitted_model, coef_ = self._fit(X_train, y_train)
+            ginis.append(gini(y_true=y_test, y_pred=fitted_model.predict_proba(X_test)[:, 1]))
+            coefs.append(coef_)
+        return ginis, coefs
 
     def Fit(self, columns):
-        ''' Fit model
+        """ Fit model
         Keyword arguments:
         columns -- list of factors in model to fit
-        '''
+        """
         self._columns = columns
         self._fitted_model = self._fitModel(columns)
         self.aic = self._fitted_model.aic
         self.bic = self._fitted_model.bic
         return self.aic, self.bic
 
-    def ExploreOneFactorImportance(self, columns, changeSign=True):
-        ''' Return factor importance for all given samples
+    def ExploreOneFactorImportance(self, columns, change_sign=True):
+        """ Return factor importance for all given samples
         Keyword arguments:
         columns -- list of factors to check
         changeSign -- indicate whether change the sign of result (default True)
-        '''
-        multiplier = -1 if changeSign else 1
+        """
+        multiplier = -1 if change_sign else 1
 
         result = pd.DataFrame(index=columns)
 
@@ -231,39 +271,53 @@ class Modeler:
 
         return result
 
-    def ExploreOneFactorImportanceIntervals(self, columns, changeSign=True):
-        ''' Return factor importance for all given samples
+    def ExploreOneFactorImportanceIntervals(self, columns, changeSign=True, return_columns=['TRAIN', 'TEST', 'OOT', 'ALL']):
+        """ Return factor importance for all given samples
         Keyword arguments:
         columns -- list of factors to check
         changeSign -- indicate   whether change the sign of result (default True)
-        '''
+        """
         if self._oot is None and self._test is None and self._train is None:
             raise Exception('Modeller has not have any data')
         multiplier = -1 if changeSign else 1
 
         if self._period is not None:
             results = []
-            if self._train is not None:
+            if self._train is not None and 'TRAIN'.upper() in return_columns:
                 for period in self._train[self._period].unique():
                     for column in columns:
                         tmp_data = self._train.loc[self._train[self._period] == period, [column, self._target]].dropna()
                         g = gini(y_pred=multiplier * tmp_data[column], y_true=tmp_data[self._target])
                         results.append(('TRAIN', period, column, g))
 
-            if self._test is not None:
-                results = []
+            if self._test is not None and 'TEST'.upper() in return_columns:
                 for period in self._test[self._period].unique():
                     for column in columns:
                         tmp_data = self._test.loc[self._test[self._period] == period, [column, self._target]].dropna()
                         g = gini(y_pred=multiplier * tmp_data[column], y_true=tmp_data[self._target])
                         results.append(('TEST', period, column, g))
 
-            if self._oot is not None:
+            if self._oot is not None and 'OOT'.upper() in return_columns:
                 for period in self._oot[self._period].unique():
                     for column in columns:
                         tmp_data = self._oot.loc[self._oot[self._period] == period, [column, self._target]].dropna()
                         g = gini(y_pred=multiplier * tmp_data[column], y_true=tmp_data[self._target])
                         results.append(('OOT', period, column, g))
+
+            if 'ALL'.upper() in return_columns:
+                if self._train is not None:
+                    all_data = self._train
+                    if self._test is not None:
+                        all_data = all_data.append(self._test)
+                        if self._oot is not None:
+                            all_data = all_data.append(self._oot)
+
+                for period in all_data[self._period].unique():
+                    for column in columns:
+                        tmp_data = all_data.loc[all_data[self._period] == period, [column, self._target]].dropna()
+                        g = gini(y_pred=multiplier * tmp_data[column], y_true=tmp_data[self._target])
+                        results.append(('ALL', period, column, g))
+                del all_data
 
         results_df = pd.DataFrame(results)
         results_df.columns = ['subset', 'period', 'column', 'gini']
@@ -275,43 +329,43 @@ class Modeler:
         return pd.concat(subsets, axis=1).sort_index()
 
     def GetModelSummary(self):
-        ''' Return fitted model summary'''
+        """ Return fitted model summary"""
         if self._fitted_model is None:
             raise Exception('Modeller is not fitted')
         return self._fitted_model.summary()
 
     def GetModelQuality(self):
-        ''' Plot ROC-curves for fitted model on all given samples (train, test, out of time)'''
+        """ Plot ROC-curves for fitted model on all given samples (train, test, out of time)"""
         if self._fitted_model is None:
             raise Exception('Modeller is not fitted')
         fact_list = list()
         predict_list = list()
         color_list = list()
         names_list = list()
-        
+
         train_predicted = self._fitted_model.predict(self._train)
         train_fact = self._train[self._target]
-        
+
         fact_list.append(train_fact)
         predict_list.append(train_predicted)
         color_list.append('g')
         names_list.append('train')
-        
+
         try:
             test_predicted = self._fitted_model.predict(self._test)
             test_fact = self._test[self._target]
-            
+
             fact_list.append(test_fact)
             predict_list.append(test_predicted)
             color_list.append('r')
             names_list.append('test')
         except:
             pass
-            
+
         try:
             oot_predicted = self._fitted_model.predict(self._oot)
             oot_fact = self._oot[self._target]
-            
+
             fact_list.append(oot_fact)
             predict_list.append(oot_predicted)
             color_list.append('y')
@@ -320,59 +374,59 @@ class Modeler:
             pass
         return rocs(fact_list, predict_list, color_list, names_list)
 
-
     def Predict(self, data=None):
-        ''' Predict with fitted model
-        
+        """ Predict with fitted model
+
          Keyword arguments:
          data -- data to make predictions, if None - predict on all given samples: train, test, oot (default None)
-        '''
+        """
         if data is not None:
             fact = [data[self._target].values]
             predict = [self._fitted_model.predict(data)]
             return fact, predict
         else:
             fact = [self._train[self._target].values, self._test[self._target].values, self._oot[self._target].values]
-            predict = [self._fitted_model.predict(self._train), self._fitted_model.predict(self._test), self._fitted_model.predict(self._oot)]
+            predict = [self._fitted_model.predict(self._train), self._fitted_model.predict(self._test),
+                       self._fitted_model.predict(self._oot)]
             return fact, predict
-    
+
     def VIF(self):
-        ''' Evaluate VIF for factors in model'''
+        """ Evaluate VIF for factors in model"""
         if self._fitted_model is None or self._columns is None:
             raise Exception('Modeller is not fitted')
         vifs = vif(self._train[self._columns].dropna())
-        #return vifs
-        return pd.DataFrame([v[1] for v in vifs], 
-                            index=[v[0] for v in vifs], 
+        # return vifs
+        return pd.DataFrame([v[1] for v in vifs],
+                            index=[v[0] for v in vifs],
                             columns=['VIF'])
 
-    def StepwiseSelection(self, factors, p_in=1, p_out=0.1):
-        ''' Do stepwise selection
-        
+    def StepwiseSelection(self, factors, p_in=1, p_out=0.1, show_process=False, show_variable=False):
+        """ Do stepwise selection
+
          Keyword arguments:
          factors -- full factors list for stepwise selection
          p_in -- p-value to include (default 1)
          p_out -- p-value to exclude (default 0.1)
          kind -- type of regression, not fully implemented (default 'class')
-        '''
-        print('2')
+        """
         log = []
         models = []
-        
+
         def Log(log_text, model):
             models.append(model)
             log.append(log_text)
-        print('1')
-            
+
         factors_importance = self._oneFactorImportance(self._train, factors)
         factors_importance.sort(key=lambda x: x[1], reverse=True)
-        
+
         factors_in_model = dict()
 
         for factor_imp in factors_importance:
             factor = factor_imp[0]
+            if show_variable:
+                print(factor)
             new_factors_set = list(factors_in_model.keys()) + [factor, ]
-            new_factors_fitted_model = self._fitModel(new_factors_set)
+            new_factors_fitted_model = self._fitModel(new_factors_set, show_process)
             p_values = self._getModelPvalues(new_factors_fitted_model)
 
             # Принимаем решение по переменной
@@ -389,7 +443,7 @@ class Modeler:
                 while len(too_big_p_values) > 0 and len(factors_in_model) > 1:
                     factor_to_remove, factor_to_remove_p_val = too_big_p_values.index[0], too_big_p_values[0]
                     del factors_in_model[factor_to_remove]
-                    fitted_model = self._fitModel(list(factors_in_model.keys()))
+                    fitted_model = self._fitModel(list(factors_in_model.keys()), show_process)
                     p_values = self._getModelPvalues(fitted_model)
                     too_big_p_values = p_values[p_values > p_out]
                     Log('{} removed (p-value:{})'.format(factor_to_remove, factor_to_remove_p_val), fitted_model)
@@ -398,14 +452,14 @@ class Modeler:
         self._sw_models = models
         return log, models
 
-    def StepwiseSelectionInterval(self, factors, p_in=1, p_out=0.1):
-        ''' Do stepwise selection
+    def StepwiseSelectionInterval(self, factors, p_in=1, p_out=0.1, show_process=False, show_variable=False):
+        """ Do stepwise selection
          Keyword arguments:
          factors -- full factors list for stepwise selection
          p_in -- p-value to include (default 1)
          p_out -- p-value to exclude (default 0.1)
          kind -- type of regression, not fully implemented (default 'class')
-        '''
+        """
         log, models = [], []
 
         def Log(log_text, model):
@@ -421,8 +475,10 @@ class Modeler:
         factors_in_model = dict()
 
         for factor in factors_importance:
+            if show_variable:
+                print(factor)
             new_factors_set = list(factors_in_model.keys()) + [factor, ]
-            new_factors_fitted_model = self._fitModel(new_factors_set)
+            new_factors_fitted_model = self._fitModel(new_factors_set, show_process)
             p_values = self._getModelPvalues(new_factors_fitted_model)
 
             # Принимаем решение по переменной
@@ -439,7 +495,7 @@ class Modeler:
                 while len(too_big_p_values) > 0 and len(factors_in_model) > 1:
                     factor_to_remove, factor_to_remove_p_val = too_big_p_values.index[0], too_big_p_values[0]
                     del factors_in_model[factor_to_remove]
-                    fitted_model = self._fitModel(list(factors_in_model.keys()))
+                    fitted_model = self._fitModel(list(factors_in_model.keys()), show_process)
                     p_values = self._getModelPvalues(fitted_model)
                     too_big_p_values = p_values[p_values > p_out]
                     Log('{} removed (p-value:{})'.format(factor_to_remove, factor_to_remove_p_val), fitted_model)
@@ -447,16 +503,16 @@ class Modeler:
         self._sw_log = log
         self._sw_models = models
         return log, models
-    
+
     def StepwiseSummary(self, figure_size=(10, 10), plot=True, add_gini=True):
-        ''' Return stepwise selection results and plot stepwise path
-        
+        """ Return stepwise selection results and plot stepwise path
+
          Keyword arguments:
          figure_size -- size of plot figure (default [10,10])
-        '''
+        """
         if (self._sw_log is None) or (self._sw_models is None):
             raise Exception('Stepwise selection was not performed')
-        
+
         sum_df = pd.DataFrame(self._sw_log, columns=['Added'])
         sum_df['Removed'] = ''
         sum_df.loc[sum_df['Added'].apply(lambda x: 'removed' in x), 'Removed'] = sum_df['Added']
@@ -468,13 +524,13 @@ class Modeler:
             sum_df['Gini TRAIN'] = [
                 gini(
                     y_true=self._train[self._target],
-                    y_pred=1/(1 + np.exp(-np.dot(self._train[m.params.index[1:]], m.params[1:]) + m.params[0])))
+                    y_pred=1 / (1 + np.exp(-np.dot(self._train[m.params.index[1:]], m.params[1:]) + m.params[0])))
                 for m in self._sw_models]
             if self._test is not None:
                 sum_df['Gini TEST'] = [
                     gini(
                         y_true=self._test[self._target],
-                        y_pred=1/(1 + np.exp(-np.dot(self._test[m.params.index[1:]], m.params[1:]) + m.params[0])))
+                        y_pred=1 / (1 + np.exp(-np.dot(self._test[m.params.index[1:]], m.params[1:]) + m.params[0])))
                     for m in self._sw_models]
             if self._oot is not None:
                 sum_df['Gini OOT'] = [
@@ -482,11 +538,11 @@ class Modeler:
                         y_true=self._oot[self._target],
                         y_pred=1 / (1 + np.exp(-np.dot(self._oot[m.params.index[1:]], m.params[1:]) + m.params[0])))
                     for m in self._sw_models]
-        sum_df['Variables count'] = [len(m.params)-1 for m in self._sw_models]
+        sum_df['Variables count'] = [len(m.params) - 1 for m in self._sw_models]
 
         if plot:
             fig, ax = plt.subplots(figsize=figure_size)
-            ax.plot(sum_df['AIC'], label='AIC',color='green')
+            ax.plot(sum_df['AIC'], label='AIC', color='green')
             ax.plot(sum_df['BIC'], label='BIC', color='yellow')
             plt.legend(loc='lower left')
             ax.set(ylabel='AIC/BIC')
@@ -501,11 +557,11 @@ class Modeler:
 
     ###private###   
     
-    def _fitModel(self, columns):
+    def _fitModel(self, columns, display=False):
         if self._kind == 'class':
-            return sm.Logit(self._train[self._target].values, sm.add_constant(self._train[columns])).fit(disp=False)
+            return sm.Logit(self._train[self._target].values, sm.add_constant(self._train[columns])).fit(disp=display)
         else:
-            return sm.OLS(self._train[self._target].values, sm.add_constant(self._train[columns])).fit(disp=False)
+            return sm.OLS(self._train[self._target].values, sm.add_constant(self._train[columns])).fit(disp=display)
     
     def _getModelPvalues(self, fitted_model):
         p_values = fitted_model.pvalues
@@ -522,7 +578,7 @@ class Modeler:
         onefactor_result = []
         for column in columns:
             tmp_data = data[[column, self._target]].dropna()
-            g = gini(y_pred=multiplier*tmp_data[column], y_true=tmp_data[self._target])
+            g = gini(y_pred=multiplier * tmp_data[column], y_true=tmp_data[self._target])
             onefactor_result.append([column, g])
         return onefactor_result
 

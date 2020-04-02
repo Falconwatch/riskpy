@@ -156,3 +156,37 @@ def riskpy_make_scorecard(binner_,
             scorecard_style.background_gradient(cmap=color_map_size, subset=pd.IndexSlice[[name], [scorecard_col_size]])
 
     return scorecard_style
+
+# Упрощённая версия функции riskpy_make_scorecard для sklearn
+def make_scorecard(data, fitted_estimator, columns, binner, precision, none_text_descr, inf_re, style=True):
+    sc = []
+    for i, param_name in enumerate(columns):
+        bin_param = [(x._woes, x._gaps)  for x in binner.get_fitted_bins() if x._name == param_name]
+        if len(bin_param) == 0:
+            raise Exception('Binner does not contain features {}'.format('param_name'))
+        gaps_text = gap_translate_2_human(bin_param[0][1], False, precision, none_text_descr, inf_re)
+        for (gap_descript, gap_el, woe) in zip(gaps_text, bin_param[0][1], bin_param[0][0]):
+            part_size = calc_size_bin(data, param_name, False, gap_el, inf_re, precision)
+            sc.append((
+                param_name,
+                gap_descript,
+                round(100 * part_size / data.shape[0], precision),
+                woe,
+                fitted_estimator.coef_[0][i],
+            ))
+    sc.append(('Intercept', None, None, None,fitted_estimator.intercept_[0],))
+    scorecard = pd.DataFrame(sc, columns=['Фактор', 'Диапазон исходной переменной', 'Доля в выборке для разработки, %', 'Значение WoE-фактора', 'Оценка регрессии',])
+    scorecard['Итоговое значение'] = scorecard['Значение WoE-фактора'] * scorecard['Оценка регрессии']
+    scorecard['Скоринговый балл'] = [round(-(99) * x, 0) for x in scorecard['Итоговое значение']]
+    if style:
+        mi = pd.MultiIndex.from_arrays([scorecard['Фактор'], scorecard['Диапазон исходной переменной']], names=('Фактор', 'Диапазон исходной переменной'))
+        scorecard.set_index(mi, inplace=True)
+        scorecard.drop(['Фактор', 'Диапазон исходной переменной'], axis=1, inplace=True)
+        scorecard_style = scorecard.style
+        color_map_score = sns.light_palette('lightcoral', as_cmap=True, reverse=True)
+        color_map_size = sns.light_palette('lightgreen', as_cmap=True)
+        for name in columns:
+            scorecard_style.background_gradient(cmap=color_map_score, subset=pd.IndexSlice[[name], ['Скоринговый балл']])
+            scorecard_style.background_gradient(cmap=color_map_size, subset=pd.IndexSlice[[name], ['Доля в выборке для разработки, %']])
+        return scorecard_style
+    return scorecard

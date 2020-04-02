@@ -1,9 +1,6 @@
 # ver. 20190321-3
-import pandas as pd
-import numpy as np
 import math as math
-import matplotlib.pyplot as plt
-import seaborn as sns
+import pandas as pd
 
 
 def recalc_woe_and_gap_for_new_bins(DFCN, MAINDATA, SelBinObj, new_groups):
@@ -82,7 +79,7 @@ def gap_translate_2_human(vec, multibin, prec_, none_name, infinity_):
         return txt
 
     txts = list()
-    if multibin == False:
+    if not multibin:
         for i, p in enumerate(vec):
             txt = one_gap_translate_2_human(p, prec_, none_name, infinity_)
             txts.append(txt)

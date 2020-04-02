@@ -1,6 +1,5 @@
-import matplotlib
 import matplotlib.pyplot as plt
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve
 from sklearn.metrics import precision_recall_curve, average_precision_score
 import numpy as np
 import math
@@ -69,7 +68,7 @@ def rocs(y_true, y_pred, colors, names, name=''):
 
 
 # джини и ДИ во времени
-def plot_pd_gini_in_time(data, fact_name, pred_name, time_name, name='', zone_borders=[0, 0.4, 0.6, 1], size=[297, 210],
+def plot_pd_gini_in_time(data, fact_name, pred_name, time_name, name='', zone_borders=[0, 0.4, 0.6, 1], size=[15, 10],
                          colorful=True, alpha=0.7, grid=False):
     """
     Plot gini's coefficient and its confidence interval
@@ -92,9 +91,9 @@ def plot_pd_gini_in_time(data, fact_name, pred_name, time_name, name='', zone_bo
         title = '{} {}'.format(title, name)
     plt.title(title)
     if colorful:
-        ax.fill_between(x=range(len(dates)), y1=zone_borders[0], y2=zone_borders[1], color='red', alpha=alpha)
-        ax.fill_between(x=range(len(dates)), y1=zone_borders[1], y2=zone_borders[2], color='yellow', alpha=alpha)
-        ax.fill_between(x=range(len(dates)), y1=zone_borders[2], y2=zone_borders[3], color='green', alpha=alpha)
+        ax.fill_between(x=dates, y1=zone_borders[0], y2=zone_borders[1], color='red', alpha=alpha)
+        ax.fill_between(x=dates, y1=zone_borders[1], y2=zone_borders[2], color='yellow', alpha=alpha)
+        ax.fill_between(x=dates, y1=zone_borders[2], y2=zone_borders[3], color='green', alpha=alpha)
     else:
         colors = (['black', 'yellow', 'green'] + ['black' for i in zone_borders])[1: -4]
         for zb, color in zip(zone_borders[1: -1], colors):
@@ -106,8 +105,8 @@ def plot_pd_gini_in_time(data, fact_name, pred_name, time_name, name='', zone_bo
     ax.set_xticks(dates)
     ax.set_yticks(sorted([x/10 for x in range(-10, 11) if x > min(min(ginis_down), 0)] + zone_borders))
     ax.tick_params(axis='x', rotation='auto')
-    l1 = ax.plot(range(len(dates)), ginis, c='blue', label='Значение коэф. джини во времени')
-    p1 = ax.fill_between(x=range(len(dates)), y1=ginis_up, y2=ginis_down, color='blue', alpha=alpha/6, hatch='.', linestyle='dotted', label='Доверительный интервал')
+    l1 = ax.plot(dates, ginis, c='blue', label='Значение коэф. джини во времени')
+    p1 = ax.fill_between(x=dates, y1=ginis_up, y2=ginis_down, color='blue', alpha=alpha/6, hatch='.', linestyle='dotted', label='Доверительный интервал')
     ax.legend(handles=l1 + [p1, ], )
     ax.set_xlabel('Дата')
     ax.set_ylabel('Коэф. джини')
