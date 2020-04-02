@@ -1,10 +1,11 @@
 import numpy as np
 import pandas as pd
 import math as math
+import pickle
 from sklearn import tree
 from sklearn.linear_model import LinearRegression
 from enum import Enum
-import pickle
+import multiprocessing as mp
 
 
 class BinnerType(Enum):
@@ -13,13 +14,6 @@ class BinnerType(Enum):
 
 
 class Binner:
-    # флаги хороших/плохих
-    _bad_v = 1
-    _good_v = 0
-    _binner_type = BinnerType.IV
-    _fitted_bins = None
-    _target_variable = None
-
     def __init__(self, binner_type=BinnerType.IV, good_mark=0, bad_mark=1):
         """
         Create binner instance
@@ -32,47 +26,98 @@ class Binner:
         self._good_v = good_mark
         self._bad_v = bad_mark
         self._binner_type = binner_type
+        self._fitted_bins = None
+        self._target_variable = None
+        self._exclude = []
+
+    def __eq__(self, other):
+        assert (self._fitted_bins is not None) and (other._fitted_bins is not None), "Binner is not fitted"
+        assert len(self._fitted_bins) == len(other._fitted_bins), "Not equal amount of features binned"
+        flag = True
+        for i in range(len(self._fitted_bins)):
+            if (self._fitted_bins[i]._name != other._fitted_bins[i]._name) or \
+                    (self._fitted_bins[i]._woes != other._fitted_bins[i]._woes) or \
+                    (self._fitted_bins[i]._gaps != other._fitted_bins[i]._gaps):
+                flag = False
+        return flag
 
     # Фитинг биннера к данным
-    def fit(self, data, target, power=5, binning_settings=()):
+    def fit(self, data, target, power=5, binning_settings=(), exclude=[], verbose=False):
         """
         Fit binner to data
         :param data: Source data
         :param target: Target variable
         :param power: Max depth of splitting
         :param binning_settings: Additional parameters for binning
+        :param exclude: Columns in table which are not for binning
         :return:
         """
         self._target_variable = target
+        self._exclude = exclude
         bin_data = list()
-        for column in data.columns[data.columns != target]:
+        for column in [x for x in data.columns if x not in [target, ] + self._exclude]:
+            if verbose:
+                print(column)
             variable_settings = None
             settings_list = [bs for bs in binning_settings if bs._variable_name == column]
-            if (len(settings_list) == 1):
+            if len(settings_list) == 1:
                 variable_settings = settings_list[0]
             x = data[column]
             y = data[target]
-            w = self._bin(x, y, settings=variable_settings, power=power)
+            w = self._bin(x, y, column, settings=variable_settings, power=power)
             w._name = column
             bin_data.append(w)
         self._fitted_bins = bin_data
         return bin_data
 
+    # Фитинг биннера к данным в мультипоточном режиме
+    def fit_mp(self, data, target, power=5, binning_settings=(), exclude=[], n_jobs=1):
+        """
+        Fit binner to data with multiprocessing
+        :param data: Source data
+        :param target: Target variable
+        :param power: Max depth of splitting
+        :param binning_settings: Additional parameters for binning
+        :param exclude: Columns in table which are not for binning
+        :return:
+        """
+        self._target_variable = target
+        self._exclude = exclude
+
+        def find_settings(column_name):
+            settings_list = [bs for bs in binning_settings if bs._variable_name == column_name]
+            if len(settings_list) == 1:
+                variable_settings = settings_list[0]
+                return variable_settings
+            return None
+
+        args = [(data[column], data[target], column, power, find_settings(column)) for column in
+                [x for x in data.columns if x not in [target, ] + self._exclude]]
+
+        pool = mp.Pool(n_jobs)
+        bin_data = pool.starmap(self._bin, args)
+        pool.close()
+        pool.terminate()
+
+        self._fitted_bins = bin_data
+        return bin_data
+
     # Применение бинов к данным - возвращает WOE факторы
-    def transform(self, data_in, exclude=()):
+    def transform(self, data_in, exclude=[]):
         """
         Transform data
         :param data_in: Data to be transformed
         :param exclude: List of excluded variables (will be ignored during transformation)
         :return: Transformed data
         """
-        if self._fitted_bins == None or self._target_variable == None:
+        if self._fitted_bins is None or self._target_variable is None:
             raise Exception("Binner is not fitted!")
 
         target = self._target_variable
         data_splitting = self._fitted_bins
         data = data_in.copy()
-        for ds in [bw for bw in data_splitting if (bw._iv >= 0.00) & (str(bw._name) not in " ".join(exclude))]:
+        for ds in [bw for bw in data_splitting if
+                   (bw._iv >= 0.00) & (str(bw._name) not in " ".join(exclude + self._exclude))]:
             var = str(ds._name)
             bins = [a for a in zip(ds._gaps, ds._woes)]
             # not nan
@@ -81,12 +126,12 @@ class Binner:
                 high = bi[0][1]
                 data.loc[(data[var] >= low) & (data[var] < high) & (~pd.isnull(data[var])), var + '_woe'] = bi[1]
 
-            # nan  
+            # nan
             try:
                 data.loc[np.isnan(data[var]), var + "_woe"] = [b for b in bins if b[0][0] is None][0][1]
             except:
                 pass
-        learn_columns = [col for col in data.columns if ('woe' in col)]
+        learn_columns = [col for col in data.columns if ('woe' in col)] + self._exclude
         learn_columns.append(target)
         learn_data = data[learn_columns]
         return learn_data
@@ -131,10 +176,12 @@ class Binner:
             pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
 
     # Разбиение на бины одной переменной
-    def _bin(self, x, y, power=2, settings=None):
+    def _bin(self, x, y, variable_name, power=2, settings=None):
         check_mono = True
-        if not settings == None:
+        min_leaf_ratio = 0.1
+        if settings is not None:
             check_mono = settings._monotone
+            min_leaf_ratio = settings._min_leaf_ratio
 
         # инициализируем результаты
         best_gaps = []
@@ -176,8 +223,10 @@ class Binner:
 
         # строим деревья разной глубины, ища наилучшее разбиение на чистых (без пустого) данных
         for depth in range(1, power + 1):
+
             # Строим дерево
-            dt = tree.DecisionTreeClassifier(max_depth=depth, min_samples_leaf=int(0.15 * len(clear_data['y'])))
+            dt = tree.DecisionTreeClassifier(max_depth=depth,
+                                             min_samples_leaf=max(int(min_leaf_ratio * len(all_set['y'])), 1))
             dt.fit(clear_data['x'][:, None], clear_data['y_gr'])
             # Сохраняем полученное разбиение
             gaps = self._get_gaps(dt)
@@ -216,7 +265,6 @@ class Binner:
             # IV по всем бинам
             ivs = [(gs[0] - gs[1]) * gw for gs, gw in zip(gaps_shares, gaps_woe)]
             iv = np.sum(ivs)
-
             # Случай, когда максимизируем R2
             if self._binner_type == BinnerType.R2:
                 # создаём объект-кандидат на возвращение
@@ -251,6 +299,7 @@ class Binner:
         best_b = Binning(best_gaps, best_gaps_woe, best_iv, best_gaps_shares, best_gaps_counts, gini,
                          best_gaps_counts_shares, best_gaps_avg, best_hhi)
         best_b._r2 = best_r2
+        best_b._name = variable_name
         return best_b
 
     # Вытаскиваем промежутки из дерева
@@ -305,7 +354,7 @@ class Binner:
             gaps_shares.append([gap_goods_share, gap_bads_share])
             gaps_woe.append(woe)
 
-        gaps_counts_shares = [ (gaps_count[0]+0.000001) / (gaps_count[1]+0.000001) for gaps_count in gaps_counts]
+        gaps_counts_shares = [(gaps_count[0] + 0.000001) / (gaps_count[1] + 0.000001) for gaps_count in gaps_counts]
 
         return gaps_shares, gaps_woe, gaps_counts, gaps_counts_shares, gaps_avg
 
@@ -442,7 +491,7 @@ def read_file(filename='bins.prdb'):
         binner = pickle.load(inp)
         return binner
 
-    # бининг в файл
+        # бининг в файл
 
 
 class Binning:
@@ -463,7 +512,9 @@ class Binning:
 class BinningSettings:
     _monotone = True
     _variable_name = ''
+    _min_leaf_ratio = 0.1
 
-    def __init__(self, variable_name='', monotone=True):
+    def __init__(self, variable_name='', monotone=True, min_leaf_ratio=0.1):
         self._monotone = monotone
         self._variable_name = variable_name
+        self._min_leaf_ratio = min_leaf_ratio

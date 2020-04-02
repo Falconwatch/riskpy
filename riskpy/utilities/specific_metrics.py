@@ -1,6 +1,6 @@
-import matplotlib.pyplot as plt
 import math
-from . import common_metrics
+from riskpy.utilities.common_metrics import gini
+import numpy as np
 
 
 # gini и доверительный интервал
@@ -11,7 +11,9 @@ def pd_gini_interval(fact, predicted):
     :param predicted: Predicted values
     :return: CI and gini
     """
-    g = common_metrics.gini(y_true=fact, y_pred=predicted)
+    g = gini(y_true=fact, y_pred=predicted)
+    if np.isnan(g):
+        return [np.nan, np.nan, np.nan]
     t = (g + 1) / 2
     q1 = t / (2 - t)
     q2 = (2 * t ** 2) / (1 + t)
@@ -22,8 +24,9 @@ def pd_gini_interval(fact, predicted):
     return [g - 3 * res, g, g + 3 * res]
 
 
+
 # джини и ДИ во времени
-def pd_gini_in_time(data, fact_name, pred_name, time_name, name=""):
+def pd_gini_in_time(data, fact_name, pred_name, time_name):
     """
     Plot gini's coefficient and its confidence interval
     :param data: Dataframe
@@ -31,30 +34,23 @@ def pd_gini_in_time(data, fact_name, pred_name, time_name, name=""):
     :param pred_name: Name of column with predicted values
     :param time_name: Name of column with datetime values
     :param name: Name for plot title
+    :param zone_borders: Colored areas borders
+    :param size: Result plot size
+    :param colorful: color areas between borders
     """
     gini_data = data.dropna().copy()
-    times = gini_data[time_name].unique()
-    times_gini = list()
+    times = sorted(gini_data[time_name].unique())
+
+    dates, ginis_down, ginis, ginis_up = list(), list(), list(), list()
 
     for time in times:
-        predicted = gini_data.loc[gini_data['DT_REP'] == time, pred_name]
-        fact = gini_data.loc[gini_data['DT_REP'] == time, fact_name]
+        predicted = gini_data.loc[gini_data[time_name] == time, pred_name]
+        fact = gini_data.loc[gini_data[time_name] == time, fact_name]
         gini_int = pd_gini_interval(fact, predicted)
-        times_gini.append([time, gini_int])
 
-    dates = [mg[0] for mg in times_gini]
-    ginis = [mg[1][1] for mg in times_gini]
-    ginis_up = [mg[1][2] for mg in times_gini]
-    ginis_down = [mg[1][0] for mg in times_gini]
+        dates.append(time)
+        ginis_down.append(gini_int[0])
+        ginis.append(gini_int[1])
+        ginis_up.append(gini_int[2])
 
-    plt.figure(figsize=[17, 10])
-    plt.title('Изменение Gini во времени и его доверительный интервал' + name)
-    plt.fill_between(x=range(len(dates)), y1=0, y2=0.4, color='red', alpha=0.7)
-    plt.fill_between(x=range(len(dates)), y1=0.4, y2=0.6, color='yellow', alpha=0.7)
-    plt.fill_between(x=range(len(dates)), y1=0.6, y2=1, color='green', alpha=0.7)
-    plt.xticks(range(len(dates)), dates, rotation='vertical')
-
-    plt.plot(range(len(dates)), ginis, c='black', label='gini')
-    plt.plot(range(len(dates)), ginis_up, c='blue')
-    plt.plot(range(len(dates)), ginis_down, c='blue')
-    plt.fill_between(x=range(len(dates)), y1=ginis_up, y2=ginis_down, color='blue', alpha=0.3)
+    return dates, ginis_down, ginis, ginis_up
