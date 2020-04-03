@@ -4,4 +4,4 @@ from .common import misc
 from .graphs import graphs
 from .modeling import binning, modeler, scoring
 from .utilities import common_metrics, specific_metrics
-from .validation import validation_pipeline, validation_tests
+from .validation import validation_pipeline, logistic_regression_validation

@@ -1,4 +1,4 @@
-from enum import Enum
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -6,21 +6,7 @@ import pandas as pd
 from riskpy.graphs.graphs import roc, plot_score_distr
 from riskpy.utilities.common_metrics import gini
 from riskpy.utilities.specific_metrics import pd_gini_interval, pd_gini_in_time
-
-
-class TestMark(Enum):
-    UNDEFINED = 0
-    RED = 1
-    YELLOW = 2
-    GREEN = 3
-
-
-class TestResult():
-    def __init__(self, data, mark=TestMark.UNDEFINED):
-        if mark is None:
-            self.mark = TestMark.UNDEFINED
-        else:
-            self.mark = mark
+from riskpy.validation.validation_common import TestMark, TestResult
 
 
 def m_1_7(data, target_name, period_name, plot=True, red_area=0.05, yellow_area=0.15):
@@ -56,7 +42,7 @@ def m_1_7(data, target_name, period_name, plot=True, red_area=0.05, yellow_area=
     return TestResult(distribution, res)
 
 
-def M_2_1(data, target_name, score_name, reverse=True, plot_roc=True, plot_score=True, red_area=0.2, yellow_area=0.4):
+def m_2_1(data, target_name, score_name, reverse=True, plot_roc=True, plot_score=True, red_area=0.2, yellow_area=0.4):
     """
     Тест M2.1: Эффективность ранжирования всей модели
     :param data: Данные
@@ -84,7 +70,7 @@ def M_2_1(data, target_name, score_name, reverse=True, plot_roc=True, plot_score
     return TestResult(None, res)
 
 
-def M_2_2(data, factors, target_name, inverse_factor=True, figure_size=(10, 10), title='Однофакторный анализ',
+def m_2_2(data, factors, target_name, inverse_factor=True, figure_size=(10, 10), title='Однофакторный анализ',
           red_area=0, yellow_area=0.05):
     """
     Тест M2.2: Эффективность ранжирования отдельных факторов
@@ -127,7 +113,7 @@ def M_2_2(data, factors, target_name, inverse_factor=True, figure_size=(10, 10),
     return TestResult(ginis, res)
 
 
-def M_2_4(data, fact_name, pred_name, time_name, title='', figure_size=[17, 10], red_area=0.4, yellow_area=0.5):
+def m_2_4(data, fact_name, pred_name, time_name, title='', figure_size=[17, 10], red_area=0.4, yellow_area=0.5):
     """
     Тест M2.4: Динамика коэффициента Джини
     :param data: Данные
@@ -144,7 +130,7 @@ def M_2_4(data, fact_name, pred_name, time_name, title='', figure_size=[17, 10],
 
     fig, ax1 = plt.subplots(figsize=figure_size)
     ax2 = ax1.twinx()
-    # couns
+    # counts
     ax1.fill_between(x=range(len(counts)), y1=np.zeros_like(counts), y2=counts, color='green', alpha=0.3)
     # gini
     ax2.plot(range(len(dates)), ginis, c='darkblue', label='gini', marker='o')

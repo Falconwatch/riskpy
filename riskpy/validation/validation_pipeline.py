@@ -1,4 +1,4 @@
-import riskpy.validation.validation_tests
+import riskpy.validation.logistic_regression_validation
 
 
 class ValidationPipelineElement():
