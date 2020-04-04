@@ -33,7 +33,7 @@ def vif(data):
     """
     res = list()
     for i in range(data.shape[1]):
-        res.append([data.columns[i], variance_inflation_factor(data.as_matrix(), i)])
+        res.append([data.columns[i], variance_inflation_factor(data.values(), i)])
     return res
 
 
