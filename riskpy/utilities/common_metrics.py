@@ -61,7 +61,7 @@ def psi(data1, data2, target_column=None, zone_borders=(0.1, 0.2)):
             result.append([column, a])
         result = pd.DataFrame({'Column': [x[0] for x in result], 'PSI': [x[1] for x in result]})
     else:
-        target_unique_values = list(set(data1[target_column].unique()).union(set(data1[target_column].unique())))
+        target_unique_values = list(set(data1[target_column].unique()).union(set(data2[target_column].unique())))
         if len(target_unique_values) > 2:
             raise Exception('Target must be binary')
         for target_value in target_unique_values:
