@@ -56,7 +56,7 @@ def __transform_data(data, lags, target_name):
     result = pd.DataFrame()
     if target_name != None:
         target = data.loc[max_lag:, target_name]
-        result[target_name] = target.values()
+        result[target_name] = target.values
 
     # Берём кажду переменную по-отдельности
     for lag in lags:
@@ -68,7 +68,7 @@ def __transform_data(data, lags, target_name):
                 var = data.loc[max_lag - step:, var_name][:]
             else:
                 var = data.loc[max_lag - step:, var_name][:-step]
-            result[var_name + "_" + str(step)] = var.values()
+            result[var_name + "_" + str(step)] = var.values
 
     # устанавливаем индекс
     result[index_column.name] = index_column[max_lag:].values
