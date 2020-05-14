@@ -2,6 +2,8 @@
 riskpy is a python package with usefull tools for risk analysts, validators and any other people who build and check statistical models
 
 ## Installation
+pip install git+https://github.com/Falconwatch/riskpy.git@master
+
 ### Dependencies
 
 riskpy requires:
