@@ -70,37 +70,37 @@ class Binner:
         self._fitted_bins = bin_data
         return bin_data
 
-    # Фитинг биннера к данным в мультипоточном режиме
-    def fit_mp(self, data, target, power=5, binning_settings=(), exclude=[], n_jobs=1):
-        """
-        Fit binner to data with multiprocessing
-        :param data: Source data
-        :param target: Target variable
-        :param power: Max depth of splitting
-        :param binning_settings: Additional parameters for binning
-        :param exclude: Columns in table which are not for binning
-        :return:
-        """
-        self._target_variable = target
-        self._exclude = exclude
+    # # Фитинг биннера к данным в мультипоточном режиме
+    # def fit_mp(self, data, target, power=5, binning_settings=(), exclude=[], n_jobs=1):
+    #     """
+    #     Fit binner to data with multiprocessing
+    #     :param data: Source data
+    #     :param target: Target variable
+    #     :param power: Max depth of splitting
+    #     :param binning_settings: Additional parameters for binning
+    #     :param exclude: Columns in table which are not for binning
+    #     :return:
+    #     """
+    #     self._target_variable = target
+    #     self._exclude = exclude
 
-        def find_settings(column_name):
-            settings_list = [bs for bs in binning_settings if bs._variable_name == column_name]
-            if len(settings_list) == 1:
-                variable_settings = settings_list[0]
-                return variable_settings
-            return None
+    #     def find_settings(column_name):
+    #         settings_list = [bs for bs in binning_settings if bs._variable_name == column_name]
+    #         if len(settings_list) == 1:
+    #             variable_settings = settings_list[0]
+    #             return variable_settings
+    #         return None
 
-        args = [(data[column], data[target], column, power, find_settings(column)) for column in
-                [x for x in data.columns if x not in [target, ] + self._exclude]]
+    #     args = [(data[column], data[target], column, power, find_settings(column)) for column in
+    #             [x for x in data.columns if x not in [target, ] + self._exclude]]
 
-        pool = mp.Pool(n_jobs)
-        bin_data = pool.starmap(self._bin, args)
-        pool.close()
-        pool.terminate()
+    #     pool = mp.Pool(n_jobs)
+    #     bin_data = pool.starmap(self._bin, args)
+    #     pool.close()
+    #     pool.terminate()
 
-        self._fitted_bins = bin_data
-        return bin_data
+    #     self._fitted_bins = bin_data
+    #     return bin_data
 
     # Применение бинов к данным - возвращает WOE факторы
     def transform(self, data_in, exclude=[]):
