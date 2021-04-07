@@ -175,132 +175,7 @@ class Binner:
         with open(filename, 'wb') as output:
             pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
 
-    # Разбиение на бины одной переменной
-    def _bin(self, x, y, variable_name, power=2, settings=None):
-        check_mono = True
-        min_leaf_ratio = 0.1
-        if settings is not None:
-            check_mono = settings._monotone
-            min_leaf_ratio = settings._min_leaf_ratio
-
-        # инициализируем результаты
-        best_gaps = []
-        best_gaps_shares = []
-        best_gaps_woe = []
-        best_iv = 0
-        best_gaps_counts = []
-        best_r2 = 0
-        best_gaps_counts_shares = []
-        best_gaps_avg = []
-        best_hhi = 1
-
-        # создаём переменную группировки - плохие/хорошие
-        y_gr = y.copy()
-        y_gr[y > np.average(y)] = 1
-        y_gr[y <= np.average(y)] = 0
-
-        # переименовываем серии для удобства обращения в дальнейшем
-        x.rename("x", inplace=True)
-        y.rename("y", inplace=True)
-        y_gr.rename("y_gr", inplace=True)
-        all_set = pd.concat([x, y, y_gr], axis=1)
-
-        data_goods = all_set[y_gr == self._good_v]
-        data_bads = all_set[y_gr == self._bad_v]
-
-        # Не nan:
-        clear_data = all_set.dropna()
-
-        # обрабатываем nan:
-        if x.isnull().sum() > 0:
-            dirty_set = all_set[pd.isnull(all_set['x'])]
-            dirty_bads = dirty_set[dirty_set['y_gr'] == self._bad_v]
-            dirty_goods = dirty_set[dirty_set['y_gr'] == self._good_v]
-            dirty_woe, dirty_goods_share, dirty_bads_share = _calc_WoE(gap_bads=dirty_bads, bads=data_bads,
-                                                                       gap_goods=dirty_goods, goods=data_goods)
-            dirty_iv = (dirty_goods_share - dirty_bads_share) * dirty_woe
-            dirty_counts_shares = (len(dirty_goods)) / (len(dirty_bads) + 0.000000001)
-
-        # строим деревья разной глубины, ища наилучшее разбиение на чистых (без пустого) данных
-        for depth in range(1, power + 1):
-
-            # Строим дерево
-            dt = tree.DecisionTreeClassifier(max_depth=depth,
-                                             min_samples_leaf=max(int(min_leaf_ratio * len(all_set['y'])), 1))
-            dt.fit(clear_data['x'][:, None], clear_data['y_gr'])
-            # Сохраняем полученное разбиение
-            gaps = self._get_gaps(dt)
-            # Считаем характеристики разбиения
-            gaps_shares, gaps_woe, gaps_counts, gaps_counts_shares, gaps_avg = self._gaps_metrics(gaps, clear_data,
-                                                                                                  all_set[
-                                                                                                      all_set[
-                                                                                                          'y_gr'] == self._good_v],
-                                                                                                  all_set[all_set[
-                                                                                                              'y_gr'] == self._bad_v])
-
-            temp_mono = False
-
-            if self._binner_type == BinnerType.IV:
-                temp_mono = _is_monotonik(vals=gaps_counts_shares)
-
-            if self._binner_type == BinnerType.R2:
-                temp_mono = _is_monotonik(gaps_avg)
-
-            is_mono = temp_mono or not check_mono  # Монотонность
-
-            # добавляем пропущенных
-            if x.isnull().sum() > 0:
-                gaps.append([None, None])
-                gaps_shares.append([dirty_goods_share, dirty_bads_share])
-                gaps_counts.append([len(dirty_goods), len(dirty_bads)])
-                gaps_woe.append(dirty_woe)
-                gaps_counts_shares.append(dirty_counts_shares)
-
-            # GINI разбиения
-            gini = _calc_gini(gaps_counts)
-
-            # HHI
-            hhi = _calc_HHI(gaps_counts)
-
-            # IV по всем бинам
-            ivs = [(gs[0] - gs[1]) * gw for gs, gw in zip(gaps_shares, gaps_woe)]
-            iv = np.sum(ivs)
-            # Случай, когда максимизируем R2
-            if self._binner_type == BinnerType.R2:
-                # создаём объект-кандидат на возвращение
-                b = Binning(gaps, gaps_woe, iv, gaps_shares, gaps_counts, gini, gaps_counts_shares, gaps_avg)
-                # R2 по всем
-                r2 = _calc_r2(x, y, b)
-                # Выбор лучшего по R2
-                if r2 > best_r2 and is_mono:
-                    best_gaps = gaps
-                    best_gaps_shares = gaps_shares
-                    best_gaps_woe = gaps_woe
-                    best_gaps_counts = gaps_counts
-                    best_iv = iv
-                    best_r2 = r2
-                    best_gaps_counts_shares = []
-                    best_gaps_avg = gaps_avg
-                    best_hhi = hhi
-
-            # Случай, когда максимизируем IV
-            if self._binner_type == BinnerType.IV:
-                # Выбор лучшего по IV
-                if iv > best_iv and is_mono:
-                    best_gaps = gaps
-                    best_gaps_shares = gaps_shares
-                    best_gaps_woe = gaps_woe
-                    best_gaps_counts = gaps_counts
-                    best_gaps_counts_shares = gaps_counts_shares
-                    best_iv = iv
-                    best_hhi = hhi
-
-        # лучшее разбиение
-        best_b = Binning(best_gaps, best_gaps_woe, best_iv, best_gaps_shares, best_gaps_counts, gini,
-                         best_gaps_counts_shares, best_gaps_avg, best_hhi)
-        best_b._r2 = best_r2
-        best_b._name = variable_name
-        return best_b
+    
 
     # Вытаскиваем промежутки из дерева
     def _get_gaps(self, estimator):
@@ -495,18 +370,198 @@ def read_file(filename='bins.prdb'):
 
 
 class Binning:
-    def __init__(self, gaps, woes, iv, shares, counts, gini, gaps_counts_shares, gaps_avg=[], hhi=-1, r2=0, name=None):
-        self._name = name
-        self._gaps = gaps
-        self._woes = woes
-        self._iv = iv
-        self._shares = shares
-        self._counts = counts
+    def __init__(self, x, y, variable_name, power=2, settings=None, binner_type=BinnerType.IV, good_mark=0, bad_mark=1):
+        if good_mark == bad_mark:
+            raise Exception('Classes cant be equal!!!')
+        self._good_v = good_mark
+        self._bad_v = bad_mark
+        self._binner_type = binner_type
+        check_mono = True
+        min_leaf_ratio = 0.1
+        if settings is not None:
+            check_mono = settings._monotone
+            min_leaf_ratio = settings._min_leaf_ratio
+
+        # инициализируем результаты
+        best_gaps = []
+        best_gaps_shares = []
+        best_gaps_woe = []
+        best_iv = 0
+        best_gaps_counts = []
+        best_r2 = 0
+        best_gaps_counts_shares = []
+        best_gaps_avg = []
+        best_hhi = 1
+
+        # создаём переменную группировки - плохие/хорошие
+        y_gr = y.copy()
+        y_gr[y > np.average(y)] = 1
+        y_gr[y <= np.average(y)] = 0
+
+        # переименовываем серии для удобства обращения в дальнейшем
+        x.rename("x", inplace=True)
+        y.rename("y", inplace=True)
+        y_gr.rename("y_gr", inplace=True)
+        all_set = pd.concat([x, y, y_gr], axis=1)
+
+        data_goods = all_set[y_gr == self._good_v]
+        data_bads = all_set[y_gr == self._bad_v]
+
+        # Не nan:
+        clear_data = all_set.dropna()
+
+        # обрабатываем nan:
+        if x.isnull().sum() > 0:
+            dirty_set = all_set[pd.isnull(all_set['x'])]
+            dirty_bads = dirty_set[dirty_set['y_gr'] == self._bad_v]
+            dirty_goods = dirty_set[dirty_set['y_gr'] == self._good_v]
+            dirty_woe, dirty_goods_share, dirty_bads_share = _calc_WoE(gap_bads=dirty_bads, bads=data_bads,
+                                                                       gap_goods=dirty_goods, goods=data_goods)
+            dirty_iv = (dirty_goods_share - dirty_bads_share) * dirty_woe
+            dirty_counts_shares = (len(dirty_goods)) / (len(dirty_bads) + 0.000000001)
+
+        # строим деревья разной глубины, ища наилучшее разбиение на чистых (без пустого) данных
+        for depth in range(1, power + 1):
+
+            # Строим дерево
+            dt = tree.DecisionTreeClassifier(max_depth=depth,
+                                             min_samples_leaf=max(int(min_leaf_ratio * len(all_set['y'])), 1))
+            dt.fit(clear_data['x'][:, None], clear_data['y_gr'])
+            # Сохраняем полученное разбиение
+            gaps = self._get_gaps(dt)
+            # Считаем характеристики разбиения
+            gaps_shares, gaps_woe, gaps_counts, gaps_counts_shares, gaps_avg = self._gaps_metrics(gaps, clear_data,
+                                                                                                  all_set[
+                                                                                                      all_set[
+                                                                                                          'y_gr'] == self._good_v],
+                                                                                                  all_set[all_set[
+                                                                                                              'y_gr'] == self._bad_v])
+
+            temp_mono = False
+
+            if self._binner_type == BinnerType.IV:
+                temp_mono = _is_monotonik(vals=gaps_counts_shares)
+
+            if self._binner_type == BinnerType.R2:
+                temp_mono = _is_monotonik(gaps_avg)
+
+            is_mono = temp_mono or not check_mono  # Монотонность
+
+            # добавляем пропущенных
+            if x.isnull().sum() > 0:
+                gaps.append([None, None])
+                gaps_shares.append([dirty_goods_share, dirty_bads_share])
+                gaps_counts.append([len(dirty_goods), len(dirty_bads)])
+                gaps_woe.append(dirty_woe)
+                gaps_counts_shares.append(dirty_counts_shares)
+
+            # GINI разбиения
+            gini = _calc_gini(gaps_counts)
+
+            # HHI
+            hhi = _calc_HHI(gaps_counts)
+
+            # IV по всем бинам
+            ivs = [(gs[0] - gs[1]) * gw for gs, gw in zip(gaps_shares, gaps_woe)]
+            iv = np.sum(ivs)
+            # Случай, когда максимизируем R2
+            if self._binner_type == BinnerType.R2:
+                # создаём объект-кандидат на возвращение
+                b = Binning(gaps, gaps_woe, iv, gaps_shares, gaps_counts, gini, gaps_counts_shares, gaps_avg)
+                # R2 по всем
+                r2 = _calc_r2(x, y, b)
+                # Выбор лучшего по R2
+                if r2 > best_r2 and is_mono:
+                    best_gaps = gaps
+                    best_gaps_shares = gaps_shares
+                    best_gaps_woe = gaps_woe
+                    best_gaps_counts = gaps_counts
+                    best_iv = iv
+                    best_r2 = r2
+                    best_gaps_counts_shares = []
+                    best_gaps_avg = gaps_avg
+                    best_hhi = hhi
+
+            # Случай, когда максимизируем IV
+            if self._binner_type == BinnerType.IV:
+                # Выбор лучшего по IV
+                if iv > best_iv and is_mono:
+                    best_gaps = gaps
+                    best_gaps_shares = gaps_shares
+                    best_gaps_woe = gaps_woe
+                    best_gaps_counts = gaps_counts
+                    best_gaps_counts_shares = gaps_counts_shares
+                    best_iv = iv
+                    best_hhi = hhi
+
+        # лучшее разбиение
+        self._gaps = best_gaps
+        self._woes = best_gaps_woe
+        self._iv = best_iv
+        self._shares = best_gaps_shares
+        self._counts = best_gaps_counts
         self._gini = gini
-        self._r2 = r2
-        self._hhi = hhi
-        self._gaps_counts_shares = gaps_counts_shares
-        self._gaps_avg = gaps_avg
+        self._gaps_counts_shares = best_gaps_counts_shares
+        self._gaps_avg = best_gaps_avg
+        self._hhi = best_hhi
+        self._r2 = best_r2
+        self._name = variable_name
+
+        # Вытаскиваем промежутки из дерева
+    def _get_gaps(self, estimator):
+        maxval = 100000000000000
+        # Вытаскиваем границы промежутков без дублей
+        threshold = _delete_duplicates(estimator.tree_.threshold)
+        # удаляем из границ -2 (искусственную границу)
+        if -2 in threshold:
+            threshold.remove(-2)
+        # Добавляем верхнюю и нижнуюю границу, для закрытия крайних промежутков
+        threshold.append(maxval)
+        threshold.append(maxval * -1)
+        # отбираем все границы и сортируем
+        threshold = list(set(threshold))
+        threshold.sort()
+        # Составляем промежуки из границ
+        gaps = []
+        for i in range(len(threshold) - 1):
+            gaps.append([threshold[i], threshold[i + 1]])
+        return gaps
+
+    # Вычислить метрики разбиения
+    def _gaps_metrics(self, gaps, data, data_good, data_bad):
+        woe = 0
+        gaps_shares = []
+        gaps_woe = []
+        gaps_counts = []
+        gaps_avg = []
+        # для каждого промежутка:
+        for gap in gaps:
+            # Нижняя и верхняя граница промежутка
+            st = gap[0]
+            end = gap[1]
+            # наблюдения в сегменте
+            gap_data = data[(data['x'] >= st) & (data['x'] <= end)]
+            # Хорошие
+            gap_goods = gap_data[gap_data['y_gr'] == self._good_v]
+            # Плохие
+            gap_bads = gap_data[gap_data['y_gr'] == self._bad_v]
+
+            # среднее значение
+            gap_avg = np.average(gap_data)
+            gaps_avg.append(gap_avg)
+
+            # counts
+            gaps_counts.append([len(gap_goods), len(gap_bads)])
+            # woe для группы
+            woe, gap_goods_share, gap_bads_share = _calc_WoE(gap_goods=gap_goods, goods=data_good,
+                                                             gap_bads=gap_bads, bads=data_bad)
+            # WOE для разбиения
+            gaps_shares.append([gap_goods_share, gap_bads_share])
+            gaps_woe.append(woe)
+
+        gaps_counts_shares = [(gaps_count[0] + 0.000001) / (gaps_count[1] + 0.000001) for gaps_count in gaps_counts]
+
+        return gaps_shares, gaps_woe, gaps_counts, gaps_counts_shares, gaps_avg
 
 
 class BinningSettings:
