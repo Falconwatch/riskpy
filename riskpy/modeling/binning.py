@@ -507,6 +507,23 @@ class Binning:
         self._r2 = best_r2
         self._name = variable_name
 
+    # Применение бинов к данным - возвращает WOE факторы
+    def transform(self, data_in):
+        """
+        Transform data
+        :param data_in: Data to be transformed
+        :param exclude: List of excluded variables (will be ignored during transformation)
+        :return: Transformed data
+        """
+        data_out = data_in.copy()
+        data_out.name = data_in.name+'_woe'
+        for gap, value in zip(self._gaps, self._woes):
+            if gap[0] is None:
+                data_out.loc[(data_in.isnull())] = value
+            else:
+                data_out.loc[(data_in >= gap[0]) & (data_in < gap[1])] = value
+        return data_out
+
         # Вытаскиваем промежутки из дерева
     def _get_gaps(self, estimator):
         maxval = 100000000000000
@@ -562,6 +579,9 @@ class Binning:
         gaps_counts_shares = [(gaps_count[0] + 0.000001) / (gaps_count[1] + 0.000001) for gaps_count in gaps_counts]
 
         return gaps_shares, gaps_woe, gaps_counts, gaps_counts_shares, gaps_avg
+
+
+
 
 
 class BinningSettings:
