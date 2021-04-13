@@ -54,7 +54,9 @@ class Binner:
         """
         self._target_variable = target
         self._exclude = exclude
+
         bin_data = list()
+        bin_names = list()
         for column in [x for x in data.columns if x not in [target, ] + self._exclude]:
             if verbose:
                 print(column)
@@ -64,9 +66,12 @@ class Binner:
                 variable_settings = settings_list[0]
             x = data[column]
             y = data[target]
-            w = self._bin(x, y, column, settings=variable_settings, power=power)
-            w._name = column
-            bin_data.append(w)
+            w = Binning(x, y, column, power=power, settings=variable_settings, binner_type=self._binner_type, good_mark=self._good_v, bad_mark=self._bad_v)
+            if len(w._gaps) > 0:
+                bin_data.append(w)
+            else:
+                print("could not bin feature " + column)
+                del w
         self._fitted_bins = bin_data
         return bin_data
 
@@ -102,6 +107,25 @@ class Binner:
     #     self._fitted_bins = bin_data
     #     return bin_data
 
+    def get_bin_names(self):
+        names = []
+        for binning_object in self._fitted_bins:
+            names.append(binning_object._name)
+        return(names)
+
+    def get_binning(self, name):
+        """
+        get binning object from binner
+        :param name: name of corresponding feature
+        :return: binning object if object with same name exist in binner or Nan if it doesn't
+        """
+        for binning_object in self._fitted_bins:
+            if (name == binning_object._name):
+                return(binning_object)
+            else:
+                continue
+        return(np.nan)
+
     # Применение бинов к данным - возвращает WOE факторы
     def transform(self, data_in, exclude=[]):
         """
@@ -113,28 +137,17 @@ class Binner:
         if self._fitted_bins is None or self._target_variable is None:
             raise Exception("Binner is not fitted!")
 
+        names = self.get_bin_names()
         target = self._target_variable
-        data_splitting = self._fitted_bins
         data = data_in.copy()
-        for ds in [bw for bw in data_splitting if
-                   (bw._iv >= 0.00) & (str(bw._name) not in " ".join(exclude + self._exclude))]:
-            var = str(ds._name)
-            bins = [a for a in zip(ds._gaps, ds._woes)]
-            # not nan
-            for bi in [bb for bb in bins if bb[0][0] is not None]:
-                low = bi[0][0]
-                high = bi[0][1]
-                data.loc[(data[var] >= low) & (data[var] < high) & (~pd.isnull(data[var])), var + '_woe'] = bi[1]
-
-            # nan
-            try:
-                data.loc[np.isnan(data[var]), var + "_woe"] = [b for b in bins if b[0][0] is None][0][1]
-            except:
-                pass
+        for binning_obj in self._fitted_bins:
+            data = pd.concat([data,binning_obj.transform(data[binning_obj._name])], axis=1)
+            data.append(binning_obj.transform(data[binning_obj._name]))
         learn_columns = [col for col in data.columns if ('woe' in col)] + self._exclude
         learn_columns.append(target)
         learn_data = data[learn_columns]
         return learn_data
+
 
     # Возврат полученных бинов
     def get_fitted_bins(self):
@@ -174,65 +187,6 @@ class Binner:
         """
         with open(filename, 'wb') as output:
             pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
-
-    
-
-    # Вытаскиваем промежутки из дерева
-    def _get_gaps(self, estimator):
-        maxval = 100000000000000
-        # Вытаскиваем границы промежутков без дублей
-        threshold = _delete_duplicates(estimator.tree_.threshold)
-        # удаляем из границ -2 (искусственную границу)
-        if -2 in threshold:
-            threshold.remove(-2)
-        # Добавляем верхнюю и нижнуюю границу, для закрытия крайних промежутков
-        threshold.append(maxval)
-        threshold.append(maxval * -1)
-        # отбираем все границы и сортируем
-        threshold = list(set(threshold))
-        threshold.sort()
-        # Составляем промежуки из границ
-        gaps = []
-        for i in range(len(threshold) - 1):
-            gaps.append([threshold[i], threshold[i + 1]])
-        return gaps
-
-    # Вычислить метрики разбиения
-    def _gaps_metrics(self, gaps, data, data_good, data_bad):
-        woe = 0
-        gaps_shares = []
-        gaps_woe = []
-        gaps_counts = []
-        gaps_avg = []
-        # для каждого промежутка:
-        for gap in gaps:
-            # Нижняя и верхняя граница промежутка
-            st = gap[0]
-            end = gap[1]
-            # наблюдения в сегменте
-            gap_data = data[(data['x'] >= st) & (data['x'] <= end)]
-            # Хорошие
-            gap_goods = gap_data[gap_data['y_gr'] == self._good_v]
-            # Плохие
-            gap_bads = gap_data[gap_data['y_gr'] == self._bad_v]
-
-            # среднее значение
-            gap_avg = np.average(gap_data)
-            gaps_avg.append(gap_avg)
-
-            # counts
-            gaps_counts.append([len(gap_goods), len(gap_bads)])
-            # woe для группы
-            woe, gap_goods_share, gap_bads_share = _calc_WoE(gap_goods=gap_goods, goods=data_good,
-                                                             gap_bads=gap_bads, bads=data_bad)
-            # WOE для разбиения
-            gaps_shares.append([gap_goods_share, gap_bads_share])
-            gaps_woe.append(woe)
-
-        gaps_counts_shares = [(gaps_count[0] + 0.000001) / (gaps_count[1] + 0.000001) for gaps_count in gaps_counts]
-
-        return gaps_shares, gaps_woe, gaps_counts, gaps_counts_shares, gaps_avg
-
 
 """
 ##############################################################
@@ -371,6 +325,10 @@ def read_file(filename='bins.prdb'):
 
 class Binning:
     def __init__(self, x, y, variable_name, power=2, settings=None, binner_type=BinnerType.IV, good_mark=0, bad_mark=1):
+        self.fit(x, y, variable_name, power, settings, binner_type, good_mark, bad_mark)
+
+
+    def fit(self, x, y, variable_name, power=2, settings=None, binner_type=BinnerType.IV, good_mark=0, bad_mark=1):
         if good_mark == bad_mark:
             raise Exception('Classes cant be equal!!!')
         self._good_v = good_mark
@@ -516,7 +474,8 @@ class Binning:
         :return: Transformed data
         """
         data_out = data_in.copy()
-        data_out.name = data_in.name+'_woe'
+        data_out.name = self._name+'_woe'
+
         for gap, value in zip(self._gaps, self._woes):
             if gap[0] is None:
                 data_out.loc[(data_in.isnull())] = value
