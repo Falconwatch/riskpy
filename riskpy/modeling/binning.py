@@ -108,6 +108,10 @@ class Binner:
     #     return bin_data
 
     def get_bin_names(self):
+        """
+        get binning names from binner
+        :return: binning object if object with same name exist in binner or Nan if it doesn't
+        """
         names = []
         for binning_object in self._fitted_bins:
             names.append(binning_object._name)
@@ -141,6 +145,8 @@ class Binner:
         target = self._target_variable
         data = data_in.copy()
         for binning_obj in self._fitted_bins:
+            if (binning_obj._name in exclude):
+                continue
             data = pd.concat([data,binning_obj.transform(data[binning_obj._name])], axis=1)
             data.append(binning_obj.transform(data[binning_obj._name]))
         learn_columns = [col for col in data.columns if ('woe' in col)] + self._exclude
