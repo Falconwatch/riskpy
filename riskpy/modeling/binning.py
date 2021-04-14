@@ -76,7 +76,8 @@ class Binner:
         return bin_data
 
     # # Фитинг биннера к данным в мультипоточном режиме
-    # def fit_mp(self, data, target, power=5, binning_settings=(), exclude=[], n_jobs=1):
+    def fit_mp(self, data, target, power=5, binning_settings=(), exclude=[], n_jobs=1):
+        self.fit(data=data, target=target, power=power, binning_settings=binning_settings, exclude=exclude)
     #     """
     #     Fit binner to data with multiprocessing
     #     :param data: Source data
