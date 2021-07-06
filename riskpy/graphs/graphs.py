@@ -69,7 +69,7 @@ def rocs(y_true, y_pred, colors, names, name=''):
 
 # джини и ДИ во времени
 def plot_pd_gini_in_time(data, fact_name, pred_name, time_name, name='', zone_borders=[0, 0.4, 0.6, 1], size=[15, 10],
-                         colorful=True, alpha=0.7, grid=False):
+                         colorful=True, alpha=0.7, grid=False, mode_rotationx = 'auto'):
     """
     Plot gini's coefficient and its confidence interval
     :param data: Dataframe
@@ -104,7 +104,7 @@ def plot_pd_gini_in_time(data, fact_name, pred_name, time_name, name='', zone_bo
     ax.plot(dates, [0 for i in dates], color='black', linestyle='dashed')
     ax.set_xticks(dates)
     ax.set_yticks(sorted([x/10 for x in range(-10, 11) if x > min(min(ginis_down), 0)] + zone_borders))
-    ax.tick_params(axis='x', rotation='auto')
+    ax.tick_params(axis='x', rotation=mode_rotationx)
     l1 = ax.plot(dates, ginis, c='blue', label='Значение коэф. джини во времени')
     p1 = ax.fill_between(x=dates, y1=ginis_up, y2=ginis_down, color='blue', alpha=alpha/6, hatch='.', linestyle='dotted', label='Доверительный интервал')
     ax.legend(handles=l1 + [p1, ], )
