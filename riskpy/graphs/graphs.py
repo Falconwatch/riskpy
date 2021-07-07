@@ -221,7 +221,7 @@ def one_bin_barchart(bining, size=5):
     # линия - доля плохих в бакете
     bins_dr = [b[1] / (b[0] + b[1]) for b in bining._counts if len(b) == 2]
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(size,size))
     ax.bar(total_bins, bins_counts, width=0.5, color='green', )
     ax.set(ylabel='Число наблюдений в бакете')
     ax2 = ax.twinx()
@@ -236,12 +236,12 @@ def one_bin_barchart(bining, size=5):
     plt.show()
 
 
-def binning_barchart(bins, size=3):
+def binning_barchart(bins, size=5):
     ''' Plot several binnings
 
      Keyword arguments:
      bins -- binning to be ploted
-     size -- size of one side of the plot(default 3)
+     size -- size of one side of the plot(default 5)
      '''
     for bining in bins:
         one_bin_barchart(bining, size=size)
